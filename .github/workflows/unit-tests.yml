@@ -50,7 +50,7 @@ jobs:
         run: |
           # stop the build if there are licensing issues
           liccheck --sfile strategy.ini --rfile source_code/requirements.txt --level CAUTIOUS --reporting liccheck-output.txt --no-deps
-          liccheck --sfile strategy.ini --rfile pip install -r requirements.txt --level CAUTIOUS --reporting liccheck-output.txt --no-deps
+          liccheck --sfile strategy.ini --rfile requirements.txt --level CAUTIOUS --reporting liccheck-output.txt --no-deps
 
       - name: Lint with flake8
         run: |
