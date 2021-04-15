@@ -115,7 +115,9 @@ class TestCloudFunction(unittest.TestCase):
         with CliRunner().isolated_filesystem():
             with httpretty.enabled():
                 httpretty.register_uri(httpretty.GET, uri=url, body='success', content_type="application/gzip")
-                download_geoip(geoip_license_key, download_path, extract_path)
+                # empty files are used, so will raise error
+                with self.assertRaises(RuntimeError):
+                    download_geoip(geoip_license_key, download_path, extract_path)
             self.assertTrue(os.path.isfile(download_path))
             self.assertTrue(os.path.isfile(extract_path))
 
@@ -162,8 +164,9 @@ class TestCloudFunction(unittest.TestCase):
                 with open(self.download_path_new, 'rb') as f:
                     body = f.read()
                 httpretty.register_uri(httpretty.GET,
-                                       uri=f'https://irus.jisc.ac.uk/sushiservice/oapen/reports/oapen_ir/?requestor_id={requestor_id}' \
-                                           f'&platform=215&begin_date={release_date}&end_date={release_date}&formatted&api_key={api_key}' \
+                                       uri=f'https://irus.jisc.ac.uk/sushiservice/oapen/reports/oapen_ir/?'
+                                           f'requestor_id={requestor_id}&platform=215&begin_date={release_date}'
+                                           f'&end_date={release_date}&formatted&api_key={api_key}'
                                            f'&attributes_to_show=Client_IP%7CCountry&publisher={publisher_uuid}',
                                        body=body)
                 download_access_stats_new(file_path, release_date, requestor_id, api_key, publisher_uuid,
@@ -275,5 +278,4 @@ def gzip_file_crc(file_path: str) -> str:
     proc: Popen = subprocess.Popen(['gzip', '-vl', file_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     output, error = proc.communicate()
     output = output.decode('utf-8')
-    error = error.decode('utf-8')
     return output.splitlines()[1].split(' ')[1].strip()
