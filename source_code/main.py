@@ -65,6 +65,8 @@ def download(request):
 
     # upload oapen access stats to bucket
     success = upload_file_to_storage_bucket(file_path, bucket_name, blob_name)
+    if not success:
+        raise RuntimeError('Uploading file to storage bucket unsuccessful')
 
 
 def download_geoip(geoip_license_key: str, download_path: str, extract_path: str):
@@ -91,6 +93,10 @@ def download_geoip(geoip_license_key: str, download_path: str, extract_path: str
           f"tar -xOzf {download_path} $registry_path > {extract_path}"
     proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, executable='/bin/bash')
     output, error = proc.communicate()
+    logging.info(f"stdout: {output}")
+    logging.info(f"stderr: {error}")
+    if proc.returncode != 0:
+        raise RuntimeError('Extracting geolite database unsuccessful')
 
 
 def download_access_stats_old(file_path: str, release_date: str, username: str, password: str, publisher_name: str,
@@ -133,7 +139,7 @@ def download_access_stats_old(file_path: str, release_date: str, username: str, 
     if response.status_code == 200 and response.text.startswith('"Book Report 1b (BR1b)"'):
         logging.info('Successfully downloaded tsv file with item requests data')
     else:
-        raise RuntimeError(f'')
+        raise RuntimeError(f'Downloading tsv file unsuccessful')
     content = response.content.decode('utf-8').splitlines()
 
     # get publisher and begin & end date
@@ -253,8 +259,8 @@ def download_access_stats_new(file_path: str, release_date: str, username: str, 
     list_to_jsonl_gz(file_path, all_results)
 
 
-def replace_ip_address(client_ip: str, geoip_client: geoip2.database.Reader) -> Tuple[
-    Union[float, None], Union[float, None], str, str, str]:
+def replace_ip_address(client_ip: str, geoip_client: geoip2.database.Reader) -> \
+        Tuple[Union[float, None], Union[float, None], str, str, str]:
     """ Replace IP addresses with geographical information using the geoip client.
 
     :param client_ip: Ip address of the client that is using oapen irus uk
