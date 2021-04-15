@@ -35,6 +35,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Install test dependencies
+        run: |
           pip install liccheck==0.4.*
           pip install flake8==3.8.*
           pip install coverage==5.2
