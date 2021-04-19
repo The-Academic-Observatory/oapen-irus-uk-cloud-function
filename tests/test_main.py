@@ -231,7 +231,7 @@ class TestCloudFunction(unittest.TestCase):
             expected_crc32c = 'yZRlqg=='
 
             # Create client for blob
-            gc_bucket_name: str = os.getenv('TESTS_GOOGLE_CLOUD_BUCKET_NAME')
+            gc_bucket_name: str = os.getenv('TEST_GCP_BUCKET_NAME')
             blob_name = 'blob'
             storage_client = storage.Client()
             bucket = storage_client.get_bucket(gc_bucket_name)
