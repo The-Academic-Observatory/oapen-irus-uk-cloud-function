@@ -30,12 +30,13 @@ from geoip2.errors import AddressNotFoundError
 from google.cloud import storage
 
 import tests.fixtures
-from source_code.main import download, download_access_stats_new, download_access_stats_old, download_geoip, \
-    list_to_jsonl_gz, replace_ip_address, upload_file_to_storage_bucket
+from main import (download, download_access_stats_new, download_access_stats_old, download_geoip,
+                  list_to_jsonl_gz, replace_ip_address, upload_file_to_storage_bucket)
 
 
 class TestCloudFunction(unittest.TestCase):
-    def __init__(self, *args, **kwargs, ):
+
+    def __init__(self, *args, **kwargs):
         """ Constructor which sets up variables used by tests.
 
         :param args: arguments.
@@ -49,11 +50,11 @@ class TestCloudFunction(unittest.TestCase):
         self.download_path_new = test_fixtures_path('download_2020_04.json')
         self.download_hash_new = '1a293f45'
 
-    @patch('source_code.main.download_geoip')
-    @patch('source_code.main.geoip2.database.Reader')
-    @patch('source_code.main.download_access_stats_new')
-    @patch('source_code.main.download_access_stats_old')
-    @patch('source_code.main.upload_file_to_storage_bucket')
+    @patch('main.download_geoip')
+    @patch('main.geoip2.database.Reader')
+    @patch('main.download_access_stats_new')
+    @patch('main.download_access_stats_old')
+    @patch('main.upload_file_to_storage_bucket')
     def test_download(self, mock_upload_blob, mock_download_old, mock_download_new, mock_geoip_reader,
                       mock_download_geoip):
         """ Test downloading OAPEN Irus UK access stats """
@@ -121,7 +122,7 @@ class TestCloudFunction(unittest.TestCase):
             self.assertTrue(os.path.isfile(download_path))
             self.assertTrue(os.path.isfile(extract_path))
 
-    @patch('source_code.main.replace_ip_address')
+    @patch('main.replace_ip_address')
     def test_download_access_stats_old(self, mock_replace_ip):
         """ Test downloading access stats before April 2020 """
         mock_replace_ip.return_value = ('23.1194', '-82.392', 'Suva', 'Peru', 'PE')
@@ -148,7 +149,7 @@ class TestCloudFunction(unittest.TestCase):
                 actual_hash = gzip_file_crc(file_path)
                 self.assertEqual(self.download_hash_old, actual_hash)
 
-    @patch('source_code.main.replace_ip_address')
+    @patch('main.replace_ip_address')
     def test_download_access_stats_new(self, mock_replace_ip):
         """ Test downloading access stats since April 2020 """
 

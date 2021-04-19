@@ -14,8 +14,8 @@ jobs:
     strategy:
       max-parallel: 4
       matrix:
-        python-version: [ 3.7 ]
-        os: [ ubuntu-18.04 ]
+        python-version: [ 3.7, 3.8, 3.9 ]
+        os: [ ubuntu-18.04, ubuntu-20.04 ]
 
     steps:
       - name: Checkout ${{ matrix.python-version }}
@@ -31,25 +31,13 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r source_code/requirements.txt
+          pip install -r tests/requirements.txt
           pip install -r requirements.txt
-
-      - name: Install test dependencies
-        run: |
-          pip install liccheck==0.4.*
-          pip install flake8==3.8.*
-          pip install coverage==5.2
-
-      - name: Set up JDK 11
-        uses: actions/setup-java@v2
-        with:
-          java-version: '11'
-          distribution: 'adopt'
 
       - name: Check licenses
         run: |
           # stop the build if there are licensing issues
-          liccheck --sfile strategy.ini --rfile source_code/requirements.txt --level CAUTIOUS --reporting liccheck-output.txt --no-deps
+          liccheck --sfile strategy.ini --rfile tests/requirements.txt --level CAUTIOUS --reporting liccheck-output.txt --no-deps
           liccheck --sfile strategy.ini --rfile requirements.txt --level CAUTIOUS --reporting liccheck-output.txt --no-deps
 
       - name: Lint with flake8
