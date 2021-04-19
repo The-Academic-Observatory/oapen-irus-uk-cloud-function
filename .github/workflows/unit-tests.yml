@@ -61,11 +61,11 @@ jobs:
 
       - name: Run unit tests with coverage
         env:
-          TESTS_GOOGLE_CLOUD_BUCKET_NAME: ${{ secrets.TESTS_GOOGLE_CLOUD_BUCKET_NAME }}
-          TESTS_GOOGLE_APPLICATION_CREDENTIALS_BASE64: ${{ secrets.TESTS_GOOGLE_APPLICATION_CREDENTIALS_BASE64 }}
+          TEST_GCP_BUCKET_NAME: ${{ secrets.TEST_GCP_BUCKET_NAME }}
+          TEST_GOOGLE_APPLICATION_CREDENTIALS_BASE64: ${{ secrets.TEST_GOOGLE_APPLICATION_CREDENTIALS_BASE64 }}
           GOOGLE_APPLICATION_CREDENTIALS: /tmp/google_application_credentials.json
         run: |
-          echo "${TESTS_GOOGLE_APPLICATION_CREDENTIALS_BASE64}" | base64 --decode > /tmp/google_application_credentials.json
+          echo "${TEST_GOOGLE_APPLICATION_CREDENTIALS_BASE64}" | base64 --decode > /tmp/google_application_credentials.json
           coverage run -m unittest discover
           coverage xml
 
