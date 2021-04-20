@@ -233,7 +233,7 @@ class TestCloudFunction(unittest.TestCase):
 
             # Create client for blob
             gc_bucket_name: str = os.getenv('TEST_GCP_BUCKET_NAME')
-            blob_name = 'blob'
+            blob_name = upload_file_name
             storage_client = storage.Client()
             bucket = storage_client.get_bucket(gc_bucket_name)
             blob = bucket.blob(blob_name)
