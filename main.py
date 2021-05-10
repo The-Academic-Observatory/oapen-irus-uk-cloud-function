@@ -214,9 +214,10 @@ def download_access_stats_new(file_path: str, release_date: str, username: str, 
 
     all_results = []
     for item in response_json['Report_Items']:
-        item_id = item['Item_ID']['URI']
-        if item_id.startswith('http://library.oapen.org/handle/'):
-            item_id = item_id[len('http://library.oapen.org/handle/'):]
+        proprietary_id = item['Item_ID']['Proprietary']
+        uri = item['Item_ID']['URI']
+        doi = item['Item_ID']['DOI']
+        isbn = item['Item_ID']['ISBN']
         book_title = item['Item']
         publisher = item['Publisher']
         for client in item['Performance']:
@@ -237,7 +238,10 @@ def download_access_stats_new(file_path: str, release_date: str, username: str, 
             client_lat, client_lon, client_city, client_country, client_country_code = replace_ip_address(client_ip,
                                                                                                           geoip_client)
             result = {
-                'item_id': item_id,
+                'proprietary_id': proprietary_id,
+                'uri': uri,
+                'doi': doi,
+                'isbn': isbn,
                 'book_title': book_title,
                 'country': country,
                 'country_code': country_code,
