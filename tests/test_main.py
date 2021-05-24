@@ -48,7 +48,7 @@ class TestCloudFunction(unittest.TestCase):
         self.download_path_old = test_fixtures_path('download_2020_03.tsv')
         self.download_hash_old = '361294f7'
         self.download_path_new = test_fixtures_path('download_2020_04.json')
-        self.download_hash_new = '4e44dfbf'
+        self.download_hash_new = 'b13ea0a6'
 
     @patch('main.download_geoip')
     @patch('main.geoip2.database.Reader')

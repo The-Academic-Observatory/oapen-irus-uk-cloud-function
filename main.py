@@ -214,10 +214,19 @@ def download_access_stats_new(file_path: str, release_date: str, username: str, 
 
     all_results = []
     for item in response_json['Report_Items']:
-        proprietary_id = item['Item_ID']['Proprietary']
-        uri = item['Item_ID']['URI']
-        doi = item['Item_ID']['DOI']
-        isbn = item['Item_ID']['ISBN']
+        # Get item IDs if they are given
+        ids = {'Proprietary': None, 'URI': None, 'DOI': None, 'ISBN': None}
+        for id_name in ids:
+            try:
+                id_value = item['Item_ID'][id_name]
+                ids[id_name] = id_value
+            except KeyError:
+                pass
+        proprietary_id = ids['Proprietary']
+        uri = ids['URI']
+        doi = ids['DOI']
+        isbn = ids['ISBN']
+
         book_title = item['Item']
         publisher = item['Publisher']
         for client in item['Performance']:
