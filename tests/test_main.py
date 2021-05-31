@@ -110,6 +110,11 @@ class TestCloudFunction(unittest.TestCase):
         mock_download_geoip.assert_called_once_with(data['geoip_license_key'], '/tmp/geolite_city.tar.gz',
                                                     '/tmp/geolite_city.mmdb')
 
+        # test runtime error in case of unsuccessful upload to bucket
+        mock_upload_blob.return_value = False
+        with self.assertRaises(RuntimeError):
+            download(request)
+
     def test_download_geoip(self):
         """ Test downloading geolite database """
         geoip_license_key = 'license_key'
@@ -163,6 +168,25 @@ class TestCloudFunction(unittest.TestCase):
                 actual_hash = gzip_file_crc(file_path)
                 self.assertEqual(self.download_hash_v4, actual_hash)
 
+                # Test response status that is not 200
+                httpretty.register_uri(httpretty.GET, uri=f'https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/br1b/'
+                                                          f'?frmRepository=1%7COAPEN+Library&frmPublisher='
+                                                          f'{publisher_name}&frmFrom={start_date}&frmTo={end_date}'
+                                                          f'&frmFormat=TSV&Go=Generate+Report',
+                                       status=400)
+                with self.assertRaises(RuntimeError):
+                    download_access_stats_old(file_path, release_date, 'username', 'password', publisher_name,
+                                              Mock(spec=geoip2.database.Reader))
+
+            # Test response status that is not 200 for login
+            with httpretty.enabled():
+                httpretty.register_uri(httpretty.POST,
+                                       uri='https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/?action=login',
+                                       status=400)
+                with self.assertRaises(RuntimeError):
+                    download_access_stats_old(file_path, release_date, 'username', 'password', publisher_name,
+                                              Mock(spec=geoip2.database.Reader))
+
     @patch('main.replace_ip_address')
     def test_download_access_stats_new(self, mock_replace_ip):
         """ Test downloading access stats since April 2020 """
@@ -174,14 +198,14 @@ class TestCloudFunction(unittest.TestCase):
             release_date = '2020-04'
             requestor_id = 'requestor_id'
             api_key = 'api_key'
+            base_url = f'https://irus.jisc.ac.uk/sushiservice/oapen/reports/oapen_ir/?requestor_id={requestor_id}' \
+                       f'&platform=215&begin_date={release_date}&end_date={release_date}&api_key={api_key}' \
+                       f'&publisher={publisher_uuid}'
 
             with httpretty.enabled():
                 # register base url
                 with open(self.download_path_v5_base, 'rb') as f:
                     body = f.read()
-                base_url = f'https://irus.jisc.ac.uk/sushiservice/oapen/reports/oapen_ir/?requestor_id={requestor_id}' \
-                           f'&platform=215&begin_date={release_date}&end_date={release_date}&api_key={api_key}' \
-                           f'&publisher={publisher_uuid}'
                 httpretty.register_uri(httpretty.GET,
                                        uri=base_url,
                                        body=body,
@@ -207,6 +231,15 @@ class TestCloudFunction(unittest.TestCase):
                                           Mock(spec=geoip2.database.Reader))
                 actual_hash = gzip_file_crc(file_path)
                 self.assertEqual(self.download_hash_v5, actual_hash)
+
+            # Test response status that is not 200
+            with httpretty.enabled():
+                httpretty.register_uri(httpretty.GET,
+                                       uri=base_url,
+                                       status=400)
+                with self.assertRaises(RuntimeError):
+                    download_access_stats_new(file_path, release_date, requestor_id, api_key, publisher_uuid,
+                                              Mock(spec=geoip2.database.Reader))
 
     def test_replace_ip_address(self):
         """ Test replacing ip address with geographical information mocking the geolite database """
