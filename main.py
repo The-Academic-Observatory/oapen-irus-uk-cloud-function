@@ -19,6 +19,7 @@ import csv
 import gzip
 import io
 import logging
+import re
 import shutil
 import subprocess
 from collections import defaultdict
@@ -104,7 +105,8 @@ def download_geoip(geoip_license_key: str, download_path: str, extract_path: str
 def download_access_stats_old(file_path: str, release_date: str, username: str, password: str, publisher_name: str,
                               geoip_client: geoip2.database.Reader):
     """ Download the oapen irus uk access stats data and replace IP addresses with geographical information.
-    Data is downloaded from both BR1b IP and BR1b Country reports and then merged.
+    Data is downloaded from both BR1b IP and BR1b Country reports, these are COUNTER 4 reports. The results for each
+    book from both reports are merged into one result dictionary.
 
     :param file_path: Path to store the access stats results.
     :param release_date: Release date ('YYYY-MM')
@@ -140,7 +142,7 @@ def download_access_stats_old(file_path: str, release_date: str, username: str, 
     else:
         raise RuntimeError(f'Login at https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/?action=login unsuccessful')
 
-    # get tsv files of reports and store results in list using csv dictreader
+    # get tsv files of reports and store results in list of dicts using csv dictreader
     ip_entries, publisher, begin_date, end_date = download_tsv_file(ip_url, session)
     country_entries, _, _, _ = download_tsv_file(country_url, session)
 
@@ -158,15 +160,17 @@ def download_access_stats_old(file_path: str, release_date: str, username: str, 
     # loop through clients in ip_entries
     for entry in ip_entries:
         proprietary_id = entry['Proprietary Identifier']
+        # Write out results of previous title when getting to new title
         if prev_id and prev_id != proprietary_id:
-            # Write out results of previous title when getting to new title
+            # Get info from all rows of country_entries with the same book id
             country_info, country_title_requests = get_country_info(prev_id, country_entries)
+            # Check that the total title requests for 1 book from IP and Country reports are the same
             assert total_title_requests == country_title_requests
             all_results = add_result(prev_id, None, doi, isbn, book_title, grant, grant_number, publisher, begin_date,
                                      end_date, total_title_requests, None, None, None, None, country_info,
-                                     location_info, all_results)
+                                     location_info, '4', all_results)
 
-            # Get title info for new title
+            # Get info for new book title
             book_title = entry['Title']
             grant = entry['Grant']
             grant_number = entry['Grant Number']
@@ -177,24 +181,24 @@ def download_access_stats_old(file_path: str, release_date: str, username: str, 
             location_info = defaultdict(list)
             total_title_requests = 0
 
-        # get location info
+        # Get location info
         client_ip = entry['IP Address']
         title_requests = entry['Reporting Period Total']
         add_location_info(location_info, client_ip, geoip_client, title_requests=title_requests)
 
-        # sum the title requests
+        # Sum the title requests
         total_title_requests += int(title_requests)
 
-        # set the previous id
+        # Set the previous id
         prev_id = proprietary_id
         continue
 
-    # add result of the last book title
+    # Add result of the last book title
     country_info, country_title_requests = get_country_info(prev_id, country_entries)
     assert total_title_requests == country_title_requests
     all_results = add_result(prev_id, None, doi, isbn, book_title, grant, grant_number, publisher, begin_date,
                              end_date, total_title_requests, None, None, None, None, country_info, location_info,
-                             all_results)
+                             '4', all_results)
 
     logging.info(f'Found {len(all_results)} access stats entries')
     list_to_jsonl_gz(file_path, all_results)
@@ -203,32 +207,38 @@ def download_access_stats_old(file_path: str, release_date: str, username: str, 
 def download_access_stats_new(file_path: str, release_date: str, username: str, password: str, publisher_uuid: str,
                               geoip_client: geoip2.database.Reader):
     """ Download the oapen irus uk access stats data and replace IP addresses with geographical information.
+    The API is queried 3 times. Once without any attributes, once with the country attribute and once with the IP
+    attribute. The results of these queries are merged into one result dictionary.
 
     :param file_path: Path to store the access stats results.
     :param release_date: Release date ('YYYY-MM')
-    :param username: Oapen username/email
-    :param password: Oapen password
+    :param username: OAPEN requestor ID
+    :param password: OAPEN API Key
     :param publisher_uuid: UUID of publisher
     :param geoip_client: Geoip client
     :return: None.
     """
-    # create url
+    # Create urls
     requestor_id = username
     api_key = password
     base_url = f'https://irus.jisc.ac.uk/sushiservice/oapen/reports/oapen_ir/?requestor_id={requestor_id}' \
-               f'&platform=215&begin_date={release_date}&end_date={release_date}&formatted&api_key={api_key}' \
+               f'&platform=215&begin_date={release_date}&end_date={release_date}&api_key={api_key}' \
                f'&publisher={publisher_uuid}'
     url_ip = base_url + '&attributes_to_show=Client_IP'
     url_country = base_url + '&attributes_to_show=Country'
+    # Get responses
     base_json = get_response(base_url)
     ip_json = get_response(url_ip)
     country_json = get_response(url_country)
 
     all_results = []
+    # Check that the number of books for each query is the same
     assert len(base_json['Report_Items']) == len(ip_json['Report_Items']) == len(country_json['Report_Items'])
 
+    # Loop through the items of the 3 json objects in parallel
     for base_item, ip_item, country_item in zip(base_json['Report_Items'], ip_json['Report_Items'],
                                                 country_json['Report_Items']):
+        # Use base item to get general info on book
         book_title = base_item['Item']
         publisher = base_item['Publisher']
         begin_date = base_item['Performance'][0]['Period']['Begin_Date']
@@ -293,30 +303,31 @@ def download_access_stats_new(file_path: str, release_date: str, username: str, 
         all_results = add_result(proprietary_id, uri, doi, isbn, book_title, None, None, publisher, begin_date,
                                  end_date, None, total_item_investigations, total_item_requests,
                                  unique_item_investigations, unique_item_requests, country_info, location_info,
-                                 all_results)
+                                 '5', all_results)
     logging.info(f'Found {len(all_results)} access stats entries')
     list_to_jsonl_gz(file_path, all_results)
 
 
 def download_tsv_file(url: str, session: Session) -> [List[dict], str, str, str]:
-    """
+    """ Download the COUNTER 4 report from an URL to a tsv file, then store the content of the tsv file in a list of
+    dictionaries.
 
-    :param url:
-    :param session:
-    :return:
+    :param url: The URL to the report.
+    :param session: The requests session.
+    :return: The report entries in a list of dictionaries, publisher name, begin date and end date.
     """
     response = session.get(url)
     if response.status_code == 200 and response.text.startswith('"Book Report 1b (BR1b)"'):
-        logging.info('Successfully downloaded tsv file with item requests data')
+        logging.info(f'Successfully downloaded tsv file from URL: {url}')
     else:
-        raise RuntimeError(f'Downloading tsv file unsuccessful')
+        raise RuntimeError(f'Downloading tsv file unsuccessful from URL: {url}')
     content = response.content.decode('utf-8').splitlines()
 
-    # get publisher and begin & end date
+    # Get publisher and begin & end date
     publisher = content[1].strip('"')
     begin_date, end_date = content[3].strip('"').split(' to ')
 
-    # store results in list using csv dictreader
+    # Store results in list using csv dictreader. Skip the first lines which contain report info.
     csv_reader = csv.DictReader(content[6:7] + content[8:], delimiter='\t')
     csv_entries = [{k: v for k, v in row.items()} for row in csv_reader]
 
@@ -324,40 +335,45 @@ def download_tsv_file(url: str, session: Session) -> [List[dict], str, str, str]
 
 
 def get_response(url: str) -> dict:
-    """
+    """ Get the response from the report URL in json format.
 
-    :param url:
-    :return:
+    :param url: The URL to the report.
+    :return: Response in JSON format.
     """
     response = requests.get(url)
+    masked_url = re.sub(r'requestor_id=.*&', 'requestor_id=<requestor_id>&',
+                        re.sub('api_key=.*&', 'api_key=<api_key>&', url))
     if response.status_code != 200:
-        raise RuntimeError(f'Request unsuccessful, status code: {response.status_code}, response: {response.text}, '
-                           f'reason: {response.reason}')
-    logging.info('Download successful, replacing IP addresses with info from geolite database.')
+        raise RuntimeError(f'Request unsuccessful, url: {masked_url}, status code: {response.status_code}, '
+                           f'response: {response.text}, reason: {response.reason}')
+    logging.info(f'Successfully got response from URL: {masked_url}')
     response_json = response.json()
     return response_json
 
 
-def get_country_info(proprietary_id: str, country_entries: List[dict]):
-    """
+def get_country_info(proprietary_id: str, country_entries: List[dict]) -> [dict, int]:
+    """ Get country info for all entries with the given proprietary id in the country_entries list.
+    After obtaining the country info, the entries are deleted from the list. The list is ordered by id and should
+    always start with the proprietary_id.
 
-    :param proprietary_id:
-    :param country_entries:
-    :return:
+    :param proprietary_id: The proprietary_id of the book.
+    :param country_entries: List with country entries from the country report.
+    :return: Country_info dict and total title requests based on the country report.
     """
     total_title_requests = 0
     country_info = defaultdict(list)
-    # Iterate through all country entries that have the same id
+    # Iterate through all country entries, sorted by id
     for i, entry in enumerate(country_entries):
-        id = entry['Proprietary Identifier']
-        if id == proprietary_id:
+        book_id = entry['Proprietary Identifier']
+        # Get info for entries that match proprietary id
+        if book_id == proprietary_id:
             country_name = entry['Country']
             title_requests = entry['Reporting Period Total']
             add_country_info(country_info, country_name, '', title_requests=title_requests)
 
             total_title_requests += int(entry['Reporting Period Total'])
         else:
-            # delete all entries with book title from list
+            # Delete all entries that were iterated through from list and exit loop
             for idx in range(i):
                 country_entries.pop(0)
             break
@@ -367,17 +383,19 @@ def get_country_info(proprietary_id: str, country_entries: List[dict]):
 def add_country_info(country_info: dict, country_name: str, country_code: str, title_requests: str = None,
                      total_item_investigations: int = None, total_item_requests: int = None,
                      unique_item_investigations: int = None, unique_item_requests: int = None):
-    """
+    """ Add items to the country_info dict. The country_info dict contains country info for 1 book. Each item is a
+    different country and the metrics associated with that country. If any value is 'None', it will be replaced with
+    an empty string to prevent a BigQuery error (REPEATED field can't be null).
 
-    :param country_info:
-    :param country_name:
-    :param country_code:
-    :param title_requests:
-    :param total_item_investigations:
-    :param total_item_requests:
-    :param unique_item_investigations:
-    :param unique_item_requests:
-    :return:
+    :param country_info: The country info dictionary to which the country will be added.
+    :param country_name: The country name.
+    :param country_code: The country code.
+    :param title_requests: The number of title requests for that country.
+    :param total_item_investigations: The number of total item investigations for that country.
+    :param total_item_requests: The number of total item requests for that country.
+    :param unique_item_investigations: The number of unique item investigations for that country.
+    :param unique_item_requests: The number of unique item requests for that country.
+    :return: Nothing. The dictionary is updated in-place.
     """
     values = {'name': country_name,
               'code': country_code,
@@ -387,7 +405,7 @@ def add_country_info(country_info: dict, country_name: str, country_code: str, t
               'unique_item_investigations': unique_item_investigations,
               'unique_item_requests': unique_item_requests}
 
-    # add values to location_info and replace None with ''
+    # Add values to location_info and replace None with ''
     for k, v in values.items():
         country_info[k].append(v if v else '')
 
@@ -396,16 +414,20 @@ def add_location_info(location_info: dict, client_ip: str, geoip_client: geoip2.
                       title_requests: str = None, total_item_investigations: int = None,
                       total_item_requests: int = None, unique_item_investigations: int = None,
                       unique_item_requests: int = None):
-    """
+    """ Add items to the location_info dict. The location_info dict contains location info for 1 book, obtained from
+    the IP address. Each item is a client with unique location info and the metrics associated with that client.
+    If any value is 'None', it will be replaced with an empty string to prevent a BigQuery error
+    (REPEATED field can't be null).
 
-    :param location_info:
-    :param client_ip:
-    :param geoip_client:
-    :param title_requests:
-    :param total_item_investigations:
-    :param total_item_requests:
-    :param unique_item_investigations:
-    :param unique_item_requests:
+    :param location_info: The location info dictionary to which the location will be added.
+    :param client_ip: The IP address of the client.
+    :param geoip_client: The geoip client, used to replace IP address.
+    :param title_requests: The number of title requests for that location.
+    :param total_item_investigations: The number of total item investigations for that location.
+    :param total_item_requests: The number of total item requests for that location.
+    :param unique_item_investigations: The number of unique item investigations for that location.
+    :param unique_item_requests: The number of unique item requests for that location.
+    :return: Nothing. The dictionary is updated in-place.
     :return:
     """
     client_lat, client_lon, client_city, client_country, client_country_code = replace_ip_address(client_ip,
@@ -421,7 +443,7 @@ def add_location_info(location_info: dict, client_ip: str, geoip_client: geoip2.
               'unique_item_investigations': unique_item_investigations,
               'unique_item_requests': unique_item_requests}
 
-    # add values to location_info and replace None with ''
+    # Add values to location_info and replace None with ''
     for k, v in values.items():
         location_info[k].append(v if v else '')
 
@@ -430,29 +452,32 @@ def add_result(proprietary_id: str, uri: [str, None], doi: str, isbn: str, book_
                grant: [str, None], grant_number: [str, None], publisher: str, begin_date: str, end_date: str,
                total_title_requests: [int, None], total_item_investigations: [int, None],
                total_item_requests: [int, None], unique_item_investigations: [int, None],
-               unique_item_requests: [int, None], country_info: dict,
-               location_info: dict, all_results: List[dict]) -> list:
-    """
+               unique_item_requests: [int, None], country_info: dict, location_info: dict, version_info: str,
+               all_results: List[dict]) -> list:
+    """ Create a single dictionary with all the metadata and measured metrics for a single book. This is then added
+    to a list which contains dictionaries for all books.
 
-    :param proprietary_id:
-    :param uri:
-    :param doi:
-    :param isbn:
-    :param book_title:
-    :param grant:
-    :param grant_number:
-    :param publisher:
-    :param begin_date:
-    :param end_date:
-    :param total_title_requests:
-    :param total_item_investigations:
-    :param total_item_requests:
-    :param unique_item_investigations:
-    :param unique_item_requests:
-    :param country_info:
-    :param location_info:
-    :param all_results:
-    :return:
+    :param proprietary_id: Proprietary identifier of the book.
+    :param uri: URI of the book. Only available for data since 2020-04-01.
+    :param doi: DOI of the book.
+    :param isbn: ISBN of the book.
+    :param book_title: Title of the book.
+    :param grant: Grant. Only available for data before 2020-04-01.
+    :param grant_number: Grant number. Only available for data before 2020-04-01.
+    :param publisher: The publisher.
+    :param begin_date: The begin date of the investigated period.
+    :param end_date: The end date of the investigated period.
+    :param total_title_requests: The total number of title requests. Only available for data before 2020-04-01.
+    :param total_item_investigations: The total number of item investigations. Only available for data since 2020-04-01.
+    :param total_item_requests: The total number of item requests. Only available for data since 2020-04-01.
+    :param unique_item_investigations: The number of unique item investigations. Only available for data since
+    2020-04-01.
+    :param unique_item_requests: The number of unique item requests. Only available for data since 2020-04-01.
+    :param country_info: Dictionary with stats on the country level.
+    :param location_info: Dictionary with stats on the location level.
+    :param version_info: The version info, corresponding to the COUNTER report type (4 or 5).
+    :param all_results: List with all results dictionaries
+    :return: The list with all results dictionaries
     """
     result = {
         'proprietary_id': proprietary_id,
@@ -472,6 +497,7 @@ def add_result(proprietary_id: str, uri: [str, None], doi: str, isbn: str, book_
         'unique_item_requests': unique_item_requests,
         'country': country_info,
         'locations': location_info,
+        'version': version_info
     }
     result = {k: None if not v else v for k, v in result.items()}
     all_results.append(result)
