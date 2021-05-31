@@ -45,10 +45,14 @@ class TestCloudFunction(unittest.TestCase):
 
         super(TestCloudFunction, self).__init__(*args, **kwargs)
 
-        self.download_path_old = test_fixtures_path('download_2020_03.tsv')
-        self.download_hash_old = '361294f7'
-        self.download_path_new = test_fixtures_path('download_2020_04.json')
-        self.download_hash_new = 'b13ea0a6'
+        self.download_path_v4_country = test_fixtures_path('download_country_2020_03.tsv')
+        self.download_path_v4_ip = test_fixtures_path('download_ip_2020_03.tsv')
+        self.download_hash_v4 = 'bce685e9'
+
+        self.download_path_v5_base = test_fixtures_path('download_base_2020_04.json')
+        self.download_path_v5_country = test_fixtures_path('download_country_2020_04.json')
+        self.download_path_v5_ip = test_fixtures_path('download_ip_2020_04.json')
+        self.download_hash_v5 = 'f1f82c14'
 
     @patch('main.download_geoip')
     @patch('main.geoip2.database.Reader')
@@ -133,21 +137,31 @@ class TestCloudFunction(unittest.TestCase):
             start_date = release_date + "-01"
             end_date = release_date + "-31"
             with httpretty.enabled():
+                # register login page
                 httpretty.register_uri(httpretty.POST,
                                        uri='https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/?action=login',
                                        body='After you have finished your session please remember to')
-
-                with open(self.download_path_old, 'rb') as f:
+                # register ip report
+                with open(self.download_path_v4_ip, 'rb') as f:
                     body = f.read()
                 httpretty.register_uri(httpretty.GET, uri=f'https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/br1b/'
                                                           f'?frmRepository=1%7COAPEN+Library&frmPublisher='
                                                           f'{publisher_name}&frmFrom={start_date}&frmTo={end_date}'
                                                           f'&frmFormat=TSV&Go=Generate+Report',
                                        body=body)
+                # register country report
+                with open(self.download_path_v4_country, 'rb') as f:
+                    body = f.read()
+                httpretty.register_uri(httpretty.GET, uri=f'https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/'
+                                                          f'br1bCountry/?frmRepository=1%7COAPEN+Library&frmPublisher='
+                                                          f'{publisher_name}&frmoapenid=&frmFrom={start_date}&frmTo='
+                                                          f'{end_date}&frmFormat=TSV&Go=Generate+Report',
+                                       body=body)
+                # download access stats
                 download_access_stats_old(file_path, release_date, 'username', 'password', publisher_name,
                                           Mock(spec=geoip2.database.Reader))
                 actual_hash = gzip_file_crc(file_path)
-                self.assertEqual(self.download_hash_old, actual_hash)
+                self.assertEqual(self.download_hash_v4, actual_hash)
 
     @patch('main.replace_ip_address')
     def test_download_access_stats_new(self, mock_replace_ip):
@@ -162,21 +176,40 @@ class TestCloudFunction(unittest.TestCase):
             api_key = 'api_key'
 
             with httpretty.enabled():
-                with open(self.download_path_new, 'rb') as f:
+                # register base url
+                with open(self.download_path_v5_base, 'rb') as f:
                     body = f.read()
+                base_url = f'https://irus.jisc.ac.uk/sushiservice/oapen/reports/oapen_ir/?requestor_id={requestor_id}' \
+                           f'&platform=215&begin_date={release_date}&end_date={release_date}&api_key={api_key}' \
+                           f'&publisher={publisher_uuid}'
                 httpretty.register_uri(httpretty.GET,
-                                       uri=f'https://irus.jisc.ac.uk/sushiservice/oapen/reports/oapen_ir/?'
-                                           f'requestor_id={requestor_id}&platform=215&begin_date={release_date}'
-                                           f'&end_date={release_date}&formatted&api_key={api_key}'
-                                           f'&attributes_to_show=Client_IP%7CCountry&publisher={publisher_uuid}',
-                                       body=body)
+                                       uri=base_url,
+                                       body=body,
+                                       match_querystring=True)
+                # register country url
+                with open(self.download_path_v5_country, 'rb') as f:
+                    body = f.read()
+                url_country = base_url + '&attributes_to_show=Country'
+                httpretty.register_uri(httpretty.GET,
+                                       uri=url_country,
+                                       body=body,
+                                       match_querystring=True)
+                # register ip url
+                with open(self.download_path_v5_ip, 'rb') as f:
+                    body = f.read()
+                url_ip = base_url + '&attributes_to_show=Client_IP'
+                httpretty.register_uri(httpretty.GET,
+                                       uri=url_ip,
+                                       body=body,
+                                       match_querystring=True)
+                # download access stats
                 download_access_stats_new(file_path, release_date, requestor_id, api_key, publisher_uuid,
                                           Mock(spec=geoip2.database.Reader))
                 actual_hash = gzip_file_crc(file_path)
-                self.assertEqual(self.download_hash_new, actual_hash)
+                self.assertEqual(self.download_hash_v5, actual_hash)
 
     def test_replace_ip_address(self):
-        """ Test replacing ip adresss with geographical information mocking the geolite database """
+        """ Test replacing ip address with geographical information mocking the geolite database """
         latitude = '23.1194',
         longitude = '-82.392',
         city = 'Suva',
@@ -202,8 +235,8 @@ class TestCloudFunction(unittest.TestCase):
         geoip_client.city.side_effect = AddressNotFoundError()
         client_lat, client_lon, client_city, client_country, client_country_code = replace_ip_address('72.59.232.155',
                                                                                                       geoip_client)
-        self.assertEqual(None, client_lat)
-        self.assertEqual(None, client_lon)
+        self.assertEqual('', client_lat)
+        self.assertEqual('', client_lon)
         self.assertEqual('', client_city)
         self.assertEqual('', client_country)
         self.assertEqual('', client_country_code)
