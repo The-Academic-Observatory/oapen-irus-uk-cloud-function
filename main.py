@@ -233,7 +233,7 @@ def download_access_stats_new(file_path: str, release_date: str, username: str, 
 
     # Check for any errors/exceptions in response
     for response_json in [base_json, ip_json, country_json]:
-        report_header = response_json['Report Header']
+        report_header = response_json['Report_Header']
         try:
             exceptions = report_header['Exceptions']
             raise RuntimeError(f'Exceptions found in report header: {exceptions}')
