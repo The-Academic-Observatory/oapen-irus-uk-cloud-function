@@ -231,6 +231,15 @@ def download_access_stats_new(file_path: str, release_date: str, username: str, 
     ip_json = get_response(url_ip)
     country_json = get_response(url_country)
 
+    # Check for any errors/exceptions in response
+    for response_json in [base_json, ip_json, country_json]:
+        report_header = response_json['Report Header']
+        try:
+            exceptions = report_header['Exceptions']
+            raise RuntimeError(f'Exceptions found in report header: {exceptions}')
+        except KeyError:
+            pass
+
     all_results = []
     # Check that the number of books for each query is the same
     assert len(base_json['Report_Items']) == len(ip_json['Report_Items']) == len(country_json['Report_Items'])
@@ -341,8 +350,8 @@ def get_response(url: str) -> dict:
     :return: Response in JSON format.
     """
     response = requests.get(url)
-    masked_url = re.sub(r'requestor_id=.*&', 'requestor_id=<requestor_id>&',
-                        re.sub('api_key=.*&', 'api_key=<api_key>&', url))
+    masked_url = re.sub(r'requestor_id=[^&]*', 'requestor_id=<requestor_id>',
+                        re.sub('api_key=[^&]*', 'api_key=<api_key>', url))
     if response.status_code != 200:
         raise RuntimeError(f'Request unsuccessful, url: {masked_url}, status code: {response.status_code}, '
                            f'response: {response.text}, reason: {response.reason}')
