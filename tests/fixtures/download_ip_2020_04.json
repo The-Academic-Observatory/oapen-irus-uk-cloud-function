@@ -24,7 +24,7 @@
     "Report_Attributes": [
       {
         "Name": "Attributes_To_Show",
-        "Value": "Client_IP|Country"
+        "Value": "Client_IP"
       }
     ]
   },
@@ -50,8 +50,8 @@
           },
           "Instance": {
             "Client_IP": "132.86.41.193",
-            "Total_Item_Investigations": 1,
-            "Total_Item_Requests": 1,
+            "Total_Item_Investigations": 2,
+            "Total_Item_Requests": 2,
             "Unique_Item_Investigations": 1,
             "Unique_Item_Requests": 1
           }
@@ -63,8 +63,8 @@
           },
           "Instance": {
             "Client_IP": "100.229.139.139",
-            "Total_Item_Investigations": 2,
-            "Total_Item_Requests": 2,
+            "Total_Item_Investigations": 1,
+            "Total_Item_Requests": 1,
             "Unique_Item_Investigations": 1,
             "Unique_Item_Requests": 1
           }
@@ -93,10 +93,6 @@
           },
           "Instance": {
             "Client_IP": "148.156.1.30",
-            "Country": {
-              "Country_Code": "AU",
-              "Country_Name": "Australia"
-            },
             "Total_Item_Investigations": 1,
             "Total_Item_Requests": 1,
             "Unique_Item_Investigations": 1,
