@@ -47,12 +47,12 @@ class TestCloudFunction(unittest.TestCase):
 
         self.download_path_v4_country = test_fixtures_path('download_country_2020_03.tsv')
         self.download_path_v4_ip = test_fixtures_path('download_ip_2020_03.tsv')
-        self.download_hash_v4 = 'bce685e9'
+        self.download_hash_v4 = '04fe8f3f'
 
         self.download_path_v5_base = test_fixtures_path('download_base_2020_04.json')
         self.download_path_v5_country = test_fixtures_path('download_country_2020_04.json')
         self.download_path_v5_ip = test_fixtures_path('download_ip_2020_04.json')
-        self.download_hash_v5 = 'f1f82c14'
+        self.download_hash_v5 = '693f4c5f'
 
     @patch('main.download_geoip')
     @patch('main.geoip2.database.Reader')
