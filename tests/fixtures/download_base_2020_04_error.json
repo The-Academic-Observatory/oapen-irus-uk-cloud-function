@@ -1,0 +1,18 @@
+{
+  "Report_Header": {
+    "Exceptions": [
+      {
+        "Code": "3050",
+        "Severity": "Warning",
+        "Message": "Parameter not recognized",
+        "Data": "Parameter platform=215 ignored"
+      },
+      {
+        "Code": "3030",
+        "Severity": "Error",
+        "Message": "No Usage Available for Requested Dates",
+        "Data": "The IRUS Service did not find any IRUS-OAPEN usage data for OAPEN Foundation."
+      }
+    ]
+  }
+}

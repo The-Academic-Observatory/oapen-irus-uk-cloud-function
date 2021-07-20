@@ -47,13 +47,13 @@ class TestCloudFunction(unittest.TestCase):
 
         self.download_path_v4_country = test_fixtures_path('download_country_2020_03.tsv')
         self.download_path_v4_ip = test_fixtures_path('download_ip_2020_03.tsv')
-        self.download_hash_v4 = '04fe8f3f'
+        self.download_hash_v4 = 'bce685e9'
 
         self.download_path_v5_base = test_fixtures_path('download_base_2020_04.json')
-        self.download_path_v5_base_exceptions = test_fixtures_path('download_base_exceptions_2020_04.json')
+        self.download_path_v5_base_error = test_fixtures_path('download_base_error_2020_04.json')
         self.download_path_v5_country = test_fixtures_path('download_country_2020_04.json')
         self.download_path_v5_ip = test_fixtures_path('download_ip_2020_04.json')
-        self.download_hash_v5 = '693f4c5f'
+        self.download_hash_v5 = 'f1f82c14'
 
     @patch('main.download_geoip')
     @patch('main.geoip2.database.Reader')
@@ -140,7 +140,6 @@ class TestCloudFunction(unittest.TestCase):
         for publisher_name in ['', 'publisher%20name']:
             with CliRunner().isolated_filesystem():
                 file_path = 'oapen_access_stats.jsonl.gz'
-                publisher_name = 'publisher%20name'
                 release_date = '2020-03'
                 start_date = release_date + "-01"
                 end_date = release_date + "-31"
@@ -203,39 +202,49 @@ class TestCloudFunction(unittest.TestCase):
                 requestor_id = 'requestor_id'
                 api_key = 'api_key'
                 base_url = f'https://irus.jisc.ac.uk/api/oapen/reports/oapen_ir/?requestor_id={requestor_id}' \
-                           f'&platform=215&begin_date={release_date}&end_date={release_date}&api_key={api_key}'
+                           f'&begin_date={release_date}&end_date={release_date}&api_key={api_key}'
                 if publisher_uuid:
                     base_url += f'&publisher={publisher_uuid}'
 
-                with httpretty.enabled():
-                    # register base url
-                    with open(self.download_path_v5_base, 'rb') as f:
-                        body = f.read()
-                    httpretty.register_uri(httpretty.GET,
-                                           uri=base_url,
-                                           body=body,
-                                           match_querystring=True)
-                    # register country url
-                    with open(self.download_path_v5_country, 'rb') as f:
-                        body = f.read()
-                    url_country = base_url + '&attributes_to_show=Country'
-                    httpretty.register_uri(httpretty.GET,
-                                           uri=url_country,
-                                           body=body,
-                                           match_querystring=True)
-                    # register ip url
-                    with open(self.download_path_v5_ip, 'rb') as f:
-                        body = f.read()
-                    url_ip = base_url + '&attributes_to_show=Client_IP'
-                    httpretty.register_uri(httpretty.GET,
-                                           uri=url_ip,
-                                           body=body,
-                                           match_querystring=True)
-                    # download access stats
-                    download_access_stats_new(file_path, release_date, requestor_id, api_key, publisher_uuid,
-                                              Mock(spec=geoip2.database.Reader))
-                    actual_hash = gzip_file_crc(file_path)
-                    self.assertEqual(self.download_hash_v5, actual_hash)
+                # Test response with header displaying error & without
+                for base_url_path in [self.download_path_v5_base, self.download_path_v5_base_error]:
+                    with httpretty.enabled():
+                        # register base url
+                        with open(base_url_path, 'rb') as f:
+                            body = f.read()
+                        httpretty.register_uri(httpretty.GET,
+                                               uri=base_url,
+                                               body=body,
+                                               match_querystring=True)
+                        # register country url
+                        with open(self.download_path_v5_country, 'rb') as f:
+                            body = f.read()
+                        url_country = base_url + '&attributes_to_show=Country'
+                        httpretty.register_uri(httpretty.GET,
+                                               uri=url_country,
+                                               body=body,
+                                               match_querystring=True)
+                        # register ip url
+                        with open(self.download_path_v5_ip, 'rb') as f:
+                            body = f.read()
+                        url_ip = base_url + '&attributes_to_show=Client_IP'
+                        httpretty.register_uri(httpretty.GET,
+                                               uri=url_ip,
+                                               body=body,
+                                               match_querystring=True)
+
+                        # test response without error in header
+                        if base_url_path == self.download_path_v5_base:
+                            download_access_stats_new(file_path, release_date, requestor_id, api_key, publisher_uuid,
+                                                      Mock(spec=geoip2.database.Reader))
+
+                            actual_hash = gzip_file_crc(file_path)
+                            self.assertEqual(self.download_hash_v5, actual_hash)
+                        # test response with error in header
+                        else:
+                            with self.assertRaises(RuntimeError):
+                                download_access_stats_new(file_path, release_date, requestor_id, api_key,
+                                                          publisher_uuid, Mock(spec=geoip2.database.Reader))
 
                 # Test response status that is not 200
                 with httpretty.enabled():
@@ -245,18 +254,6 @@ class TestCloudFunction(unittest.TestCase):
                     with self.assertRaises(RuntimeError):
                         download_access_stats_new(file_path, release_date, requestor_id, api_key, publisher_uuid,
                                                   Mock(spec=geoip2.database.Reader))
-
-            # Test report header with exceptions, because data is not available yet
-            with httpretty.enabled():
-                with open(self.download_path_v5_base_exceptions, 'rb') as f:
-                    body = f.read()
-                httpretty.register_uri(httpretty.GET,
-                                       uri=base_url,
-                                       body=body,
-                                       match_querystring=True)
-                with self.assertRaises(RuntimeError):
-                    download_access_stats_new(file_path, release_date, requestor_id, api_key, publisher_uuid,
-                                              Mock(spec=geoip2.database.Reader))
 
     def test_replace_ip_address(self):
         """ Test replacing ip address with geographical information mocking the geolite database """
