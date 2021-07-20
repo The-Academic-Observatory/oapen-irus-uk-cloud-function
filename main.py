@@ -22,7 +22,6 @@ import logging
 import re
 import shutil
 import subprocess
-from collections import defaultdict
 from datetime import datetime
 from typing import List, Tuple, Union
 
@@ -152,7 +151,7 @@ def download_access_stats_old(file_path: str, release_date: str, username: str, 
     grant_number = ip_entries[0]['Grant Number']
     doi = ip_entries[0]['DOI']
     isbn = ip_entries[0]['ISBN'].strip('ISBN ')
-    location_info = defaultdict(list)
+    location_info = []
     total_title_requests = 0
 
     all_results = []
@@ -178,7 +177,7 @@ def download_access_stats_old(file_path: str, release_date: str, username: str, 
             isbn = entry['ISBN'].strip('ISBN ')
 
             # Reset location info and total title requests
-            location_info = defaultdict(list)
+            location_info = []
             total_title_requests = 0
 
         # Get location info
@@ -267,7 +266,7 @@ def download_access_stats_new(file_path: str, release_date: str, username: str, 
         isbn = ids['ISBN']
 
         # Get location info
-        location_info = defaultdict(list)
+        location_info = []
         for client in ip_item['Performance']:
             instance = client['Instance']
             total_item_investigations = instance['Total_Item_Investigations']
@@ -283,7 +282,7 @@ def download_access_stats_new(file_path: str, release_date: str, username: str, 
                               unique_item_requests=unique_item_requests)
 
         # Get country info
-        country_info = defaultdict(list)
+        country_info = []
         for country in country_item['Performance']:
             instance = country['Instance']
             country_name = instance.get('Country', {'Country_Name': ''})['Country_Name']
@@ -360,17 +359,17 @@ def get_response(url: str) -> dict:
     return response_json
 
 
-def get_country_info(proprietary_id: str, country_entries: List[dict]) -> [dict, int]:
+def get_country_info(proprietary_id: str, country_entries: List[dict]) -> [List[dict], int]:
     """ Get country info for all entries with the given proprietary id in the country_entries list.
     After obtaining the country info, the entries are deleted from the list. The list is ordered by id and should
     always start with the proprietary_id.
 
     :param proprietary_id: The proprietary_id of the book.
     :param country_entries: List with country entries from the country report.
-    :return: Country_info dict and total title requests based on the country report.
+    :return: Country_info list and total title requests based on the country report.
     """
     total_title_requests = 0
-    country_info = defaultdict(list)
+    country_info = []
     # Iterate through all country entries, sorted by id
     for i, entry in enumerate(country_entries):
         book_id = entry['Proprietary Identifier']
@@ -389,14 +388,13 @@ def get_country_info(proprietary_id: str, country_entries: List[dict]) -> [dict,
     return country_info, total_title_requests
 
 
-def add_country_info(country_info: dict, country_name: str, country_code: str, title_requests: str = None,
+def add_country_info(country_info: List[dict], country_name: str, country_code: str, title_requests: str = None,
                      total_item_investigations: int = None, total_item_requests: int = None,
                      unique_item_investigations: int = None, unique_item_requests: int = None):
-    """ Add items to the country_info dict. The country_info dict contains country info for 1 book. Each item is a
-    different country and the metrics associated with that country. If any value is 'None', it will be replaced with
-    an empty string to prevent a BigQuery error (REPEATED field can't be null).
+    """ Add items to the country_info list. The country_info list contains dictionaries with country info for 1 book.
+    Each dict is a different country and the metrics associated with that country.
 
-    :param country_info: The country info dictionary to which the country will be added.
+    :param country_info: The country info list to which the info of a single country will be added.
     :param country_name: The country name.
     :param country_code: The country code.
     :param title_requests: The number of title requests for that country.
@@ -404,31 +402,28 @@ def add_country_info(country_info: dict, country_name: str, country_code: str, t
     :param total_item_requests: The number of total item requests for that country.
     :param unique_item_investigations: The number of unique item investigations for that country.
     :param unique_item_requests: The number of unique item requests for that country.
-    :return: Nothing. The dictionary is updated in-place.
+    :return: Nothing. The list is updated in-place.
     """
-    values = {'name': country_name,
-              'code': country_code,
-              'title_requests': title_requests,
-              'total_item_investigations': total_item_investigations,
-              'total_item_requests': total_item_requests,
-              'unique_item_investigations': unique_item_investigations,
-              'unique_item_requests': unique_item_requests}
+    country_record = {'name': country_name,
+                      'code': country_code,
+                      'title_requests': title_requests,
+                      'total_item_investigations': total_item_investigations,
+                      'total_item_requests': total_item_requests,
+                      'unique_item_investigations': unique_item_investigations,
+                      'unique_item_requests': unique_item_requests}
 
-    # Add values to location_info and replace None with ''
-    for k, v in values.items():
-        country_info[k].append(v if v else '')
+    country_info.append(country_record)
 
 
-def add_location_info(location_info: dict, client_ip: str, geoip_client: geoip2.database.Reader,
+def add_location_info(location_info: List[dict], client_ip: str, geoip_client: geoip2.database.Reader,
                       title_requests: str = None, total_item_investigations: int = None,
                       total_item_requests: int = None, unique_item_investigations: int = None,
                       unique_item_requests: int = None):
-    """ Add items to the location_info dict. The location_info dict contains location info for 1 book, obtained from
-    the IP address. Each item is a client with unique location info and the metrics associated with that client.
-    If any value is 'None', it will be replaced with an empty string to prevent a BigQuery error
-    (REPEATED field can't be null).
+    """ Add items to the location_info list. The location_info list contains dictionaries with location info for 1
+    book, obtained from the IP address. Each dict is a client with unique location info and the metrics associated
+    with that client.
 
-    :param location_info: The location info dictionary to which the location will be added.
+    :param location_info: The location info list to which the location info of a client will be added.
     :param client_ip: The IP address of the client.
     :param geoip_client: The geoip client, used to replace IP address.
     :param title_requests: The number of title requests for that location.
@@ -436,33 +431,31 @@ def add_location_info(location_info: dict, client_ip: str, geoip_client: geoip2.
     :param total_item_requests: The number of total item requests for that location.
     :param unique_item_investigations: The number of unique item investigations for that location.
     :param unique_item_requests: The number of unique item requests for that location.
-    :return: Nothing. The dictionary is updated in-place.
+    :return: Nothing. The list is updated in-place.
     :return:
     """
     client_lat, client_lon, client_city, client_country, client_country_code = replace_ip_address(client_ip,
                                                                                                   geoip_client)
-    values = {'latitude': client_lat,
-              'longitude': client_lon,
-              'city': client_city,
-              'country_name': client_country,
-              'country_code': client_country_code,
-              'title_requests': title_requests,
-              'total_item_investigations': total_item_investigations,
-              'total_item_requests': total_item_requests,
-              'unique_item_investigations': unique_item_investigations,
-              'unique_item_requests': unique_item_requests}
+    location_record = {'latitude': client_lat,
+                       'longitude': client_lon,
+                       'city': client_city,
+                       'country_name': client_country,
+                       'country_code': client_country_code,
+                       'title_requests': title_requests,
+                       'total_item_investigations': total_item_investigations,
+                       'total_item_requests': total_item_requests,
+                       'unique_item_investigations': unique_item_investigations,
+                       'unique_item_requests': unique_item_requests}
 
-    # Add values to location_info and replace None with ''
-    for k, v in values.items():
-        location_info[k].append(v if v else '')
+    location_info.append(location_record)
 
 
 def add_result(proprietary_id: str, uri: [str, None], doi: str, isbn: str, book_title: str,
                grant: [str, None], grant_number: [str, None], publisher: str, begin_date: str, end_date: str,
                total_title_requests: [int, None], total_item_investigations: [int, None],
                total_item_requests: [int, None], unique_item_investigations: [int, None],
-               unique_item_requests: [int, None], country_info: dict, location_info: dict, version_info: str,
-               all_results: List[dict]) -> list:
+               unique_item_requests: [int, None], country_info: List[dict], location_info: List[dict],
+               version_info: str, all_results: List[dict]) -> list:
     """ Create a single dictionary with all the metadata and measured metrics for a single book. This is then added
     to a list which contains dictionaries for all books.
 
@@ -482,8 +475,8 @@ def add_result(proprietary_id: str, uri: [str, None], doi: str, isbn: str, book_
     :param unique_item_investigations: The number of unique item investigations. Only available for data since
     2020-04-01.
     :param unique_item_requests: The number of unique item requests. Only available for data since 2020-04-01.
-    :param country_info: Dictionary with stats on the country level.
-    :param location_info: Dictionary with stats on the location level.
+    :param country_info: List with stats on the country level.
+    :param location_info: List with stats on the location level.
     :param version_info: The version info, corresponding to the COUNTER report type (4 or 5).
     :param all_results: List with all results dictionaries
     :return: The list with all results dictionaries

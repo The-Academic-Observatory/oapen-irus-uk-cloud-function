@@ -1,0 +1,39 @@
+{
+  "Report_Header": {
+    "Created": "2020-05-03T04:58:51Z",
+    "Created_By": "IRUS for OAPEN DSpace",
+    "Customer_ID": "",
+    "Report_ID": "OAPEN_IR",
+    "Release": "5",
+    "Report_Name": "OAPEN Custom Item Master Report",
+    "Institution_Name": "",
+    "Report_Filters": [
+      {
+        "Name": "Begin_Date",
+        "Value": "2020-04-01"
+      },
+      {
+        "Name": "End_Date",
+        "Value": "2020-04-30"
+      },
+      {
+        "Name": "OAPEN_Publisher_UUID",
+        "Value": "publisher_uuid"
+      }
+    ],
+    "Exceptions": [
+      {
+        "Code": "3031",
+        "Severity": "Warning",
+        "Message": "Usage Not Ready for Requested Dates",
+        "Data": "Last date processed is 2020-03-31"
+      },
+      {
+        "Code": "3030",
+        "Severity": "Error",
+        "Message": "No Usage Available for Requested Dates",
+        "Data": "The IRUS Service did not find any OAPEN DSpace usage data."
+      }
+    ]
+  }
+}
