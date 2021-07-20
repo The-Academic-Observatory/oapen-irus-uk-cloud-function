@@ -121,11 +121,14 @@ def download_access_stats_old(file_path: str, release_date: str, username: str, 
 
     start_date = release_date + "-01"
     end_date = release_date + "-" + last_date_month
-    ip_url = f'https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/br1b/?frmRepository=1%7COAPEN+Library&frmPublisher' \
-             f'={publisher_name}&frmFrom={start_date}&frmTo={end_date}&frmFormat=TSV&Go=Generate+Report'
+    ip_url = f'https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/br1b/?frmRepository=1%7COAPEN+Library' \
+             f'&frmFrom={start_date}&frmTo={end_date}&frmFormat=TSV&Go=Generate+Report'
     country_url = f'https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/br1bCountry/?frmRepository=1%7COAPEN+Library' \
-                  f'&frmPublisher={publisher_name}&frmoapenid=&frmFrom={start_date}&frmTo={end_date}&frmFormat=TSV' \
+                  f'&frmoapenid=&frmFrom={start_date}&frmTo={end_date}&frmFormat=TSV' \
                   f'&Go=Generate+Report'
+    if publisher_name:
+        ip_url += f'&frmPublisher={publisher_name}'
+        country_url += f'&frmPublisher={publisher_name}'
 
     # start a requests session
     session = requests.Session()
@@ -220,11 +223,13 @@ def download_access_stats_new(file_path: str, release_date: str, username: str, 
     # Create urls
     requestor_id = username
     api_key = password
-    base_url = f'https://irus.jisc.ac.uk/sushiservice/oapen/reports/oapen_ir/?requestor_id={requestor_id}' \
-               f'&platform=215&begin_date={release_date}&end_date={release_date}&api_key={api_key}' \
-               f'&publisher={publisher_uuid}'
+    base_url = f'https://irus.jisc.ac.uk/api/oapen/reports/oapen_ir/?requestor_id={requestor_id}' \
+               f'&platform=215&begin_date={release_date}&end_date={release_date}&api_key={api_key}'
+    if publisher_uuid:
+        base_url += f'&publisher={publisher_uuid}'
     url_ip = base_url + '&attributes_to_show=Client_IP'
     url_country = base_url + '&attributes_to_show=Country'
+
     # Get responses
     base_json = get_response(base_url)
     ip_json = get_response(url_ip)
