@@ -224,7 +224,7 @@ def download_access_stats_new(file_path: str, release_date: str, username: str, 
     requestor_id = username
     api_key = password
     base_url = f'https://irus.jisc.ac.uk/api/oapen/reports/oapen_ir/?requestor_id={requestor_id}' \
-               f'&platform=215&begin_date={release_date}&end_date={release_date}&api_key={api_key}'
+               f'&begin_date={release_date}&end_date={release_date}&api_key={api_key}'
     if publisher_uuid:
         base_url += f'&publisher={publisher_uuid}'
     url_ip = base_url + '&attributes_to_show=Client_IP'
