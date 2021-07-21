@@ -28,6 +28,7 @@ from typing import List, Tuple, Union
 import geoip2.database
 import jsonlines
 import requests
+from bs4 import BeautifulSoup
 from geoip2.errors import AddressNotFoundError
 from google.cloud import storage
 from requests import Session
