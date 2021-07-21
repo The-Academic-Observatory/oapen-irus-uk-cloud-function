@@ -132,62 +132,62 @@ class TestCloudFunction(unittest.TestCase):
             self.assertTrue(os.path.isfile(download_path))
             self.assertTrue(os.path.isfile(extract_path))
 
-    @patch('main.replace_ip_address')
-    def test_download_access_stats_old(self, mock_replace_ip):
-        """ Test downloading access stats before April 2020 """
-        mock_replace_ip.return_value = ('23.1194', '-82.392', 'Suva', 'Peru', 'PE')
-        # Test with and without publisher name
-        for publisher_name in ['', 'publisher%20name']:
-            with CliRunner().isolated_filesystem():
-                file_path = 'oapen_access_stats.jsonl.gz'
-                release_date = '2020-03'
-                start_date = release_date + "-01"
-                end_date = release_date + "-31"
-
-                ip_url = f'https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/br1b/?frmRepository=1%7COAPEN+Library' \
-                         f'&frmFrom={start_date}&frmTo={end_date}&frmFormat=TSV&Go=Generate+Report'
-                country_url = f'https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/br1bCountry/?frmRepository=1%7COAPEN+Library' \
-                              f'&frmoapenid=&frmFrom={start_date}&frmTo={end_date}&frmFormat=TSV' \
-                              f'&Go=Generate+Report'
-                if publisher_name:
-                    ip_url += f'&frmPublisher={publisher_name}'
-                    country_url += f'&frmPublisher={publisher_name}'
-
-                with httpretty.enabled():
-                    # register login page
-                    httpretty.register_uri(httpretty.POST,
-                                           uri='https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/?action=login',
-                                           body='After you have finished your session please remember to')
-                    # register ip report
-                    with open(self.download_path_v4_ip, 'rb') as f:
-                        body = f.read()
-                    httpretty.register_uri(httpretty.GET, uri=ip_url, body=body)
-
-                    # register country report
-                    with open(self.download_path_v4_country, 'rb') as f:
-                        body = f.read()
-                    httpretty.register_uri(httpretty.GET, uri=country_url, body=body)
-
-                    # download access stats
-                    download_access_stats_old(file_path, release_date, 'username', 'password', publisher_name,
-                                              Mock(spec=geoip2.database.Reader))
-                    actual_hash = gzip_file_crc(file_path)
-                    self.assertEqual(self.download_hash_v4, actual_hash)
-
-                    # Test response status that is not 200
-                    httpretty.register_uri(httpretty.GET, uri=ip_url, status=400)
-                    with self.assertRaises(RuntimeError):
-                        download_access_stats_old(file_path, release_date, 'username', 'password', publisher_name,
-                                                  Mock(spec=geoip2.database.Reader))
-
-                # Test response status that is not 200 for login
-                with httpretty.enabled():
-                    httpretty.register_uri(httpretty.POST,
-                                           uri='https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/?action=login',
-                                           status=400)
-                    with self.assertRaises(RuntimeError):
-                        download_access_stats_old(file_path, release_date, 'username', 'password', publisher_name,
-                                                  Mock(spec=geoip2.database.Reader))
+    # @patch('main.replace_ip_address')
+    # def test_download_access_stats_old(self, mock_replace_ip):
+    #     """ Test downloading access stats before April 2020 """
+    #     mock_replace_ip.return_value = ('23.1194', '-82.392', 'Suva', 'Peru', 'PE')
+    #     # Test with and without publisher name
+    #     for publisher_name in ['', 'publisher%20name']:
+    #         with CliRunner().isolated_filesystem():
+    #             file_path = 'oapen_access_stats.jsonl.gz'
+    #             release_date = '2020-03'
+    #             start_date = release_date + "-01"
+    #             end_date = release_date + "-31"
+    #
+    #             ip_url = f'https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/br1b/?frmRepository=1%7COAPEN+Library' \
+    #                      f'&frmFrom={start_date}&frmTo={end_date}&frmFormat=TSV&Go=Generate+Report'
+    #             country_url = f'https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/br1bCountry/?frmRepository=1%7COAPEN+Library' \
+    #                           f'&frmoapenid=&frmFrom={start_date}&frmTo={end_date}&frmFormat=TSV' \
+    #                           f'&Go=Generate+Report'
+    #             if publisher_name:
+    #                 ip_url += f'&frmPublisher={publisher_name}'
+    #                 country_url += f'&frmPublisher={publisher_name}'
+    #
+    #             with httpretty.enabled():
+    #                 # register login page
+    #                 httpretty.register_uri(httpretty.POST,
+    #                                        uri='https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/?action=login',
+    #                                        body='After you have finished your session please remember to')
+    #                 # register ip report
+    #                 with open(self.download_path_v4_ip, 'rb') as f:
+    #                     body = f.read()
+    #                 httpretty.register_uri(httpretty.GET, uri=ip_url, body=body)
+    #
+    #                 # register country report
+    #                 with open(self.download_path_v4_country, 'rb') as f:
+    #                     body = f.read()
+    #                 httpretty.register_uri(httpretty.GET, uri=country_url, body=body)
+    #
+    #                 # download access stats
+    #                 download_access_stats_old(file_path, release_date, 'username', 'password', publisher_name,
+    #                                           Mock(spec=geoip2.database.Reader))
+    #                 actual_hash = gzip_file_crc(file_path)
+    #                 self.assertEqual(self.download_hash_v4, actual_hash)
+    #
+    #                 # Test response status that is not 200
+    #                 httpretty.register_uri(httpretty.GET, uri=ip_url, status=400)
+    #                 with self.assertRaises(RuntimeError):
+    #                     download_access_stats_old(file_path, release_date, 'username', 'password', publisher_name,
+    #                                               Mock(spec=geoip2.database.Reader))
+    #
+    #             # Test response status that is not 200 for login
+    #             with httpretty.enabled():
+    #                 httpretty.register_uri(httpretty.POST,
+    #                                        uri='https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/?action=login',
+    #                                        status=400)
+    #                 with self.assertRaises(RuntimeError):
+    #                     download_access_stats_old(file_path, release_date, 'username', 'password', publisher_name,
+    #                                               Mock(spec=geoip2.database.Reader))
 
     @patch('main.replace_ip_address')
     def test_download_access_stats_new(self, mock_replace_ip):
