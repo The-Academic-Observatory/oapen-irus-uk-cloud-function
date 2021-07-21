@@ -126,9 +126,6 @@ def download_access_stats_old(file_path: str, release_date: str, username: str, 
     country_url = f'https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/br1bCountry/?frmRepository=1%7COAPEN+Library' \
                   f'&frmoapenid=&frmFrom={start_date}&frmTo={end_date}&frmFormat=TSV' \
                   f'&Go=Generate+Report'
-    if publisher_name:
-        ip_url += f'&frmPublisher={publisher_name}'
-        country_url += f'&frmPublisher={publisher_name}'
 
     # start a requests session
     session = requests.Session()
@@ -144,63 +141,75 @@ def download_access_stats_old(file_path: str, release_date: str, username: str, 
     else:
         raise RuntimeError(f'Login at https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/?action=login unsuccessful')
 
-    # get tsv files of reports and store results in list of dicts using csv dictreader
-    ip_entries, publisher, begin_date, end_date = download_tsv_file(ip_url, session)
-    country_entries, _, _, _ = download_tsv_file(country_url, session)
-
-    # set values for first book
-    book_title = ip_entries[0]['Title']
-    grant = ip_entries[0]['Grant']
-    grant_number = ip_entries[0]['Grant Number']
-    doi = ip_entries[0]['DOI']
-    isbn = ip_entries[0]['ISBN'].strip('ISBN ')
-    location_info = []
-    total_title_requests = 0
+    # Get list of all publisher names
+    if publisher_name:
+        publishers = [publisher_name]
+    else:
+        publishers = list_all_publishers(ip_url, session)
 
     all_results = []
-    prev_id = None
-    # loop through clients in ip_entries
-    for entry in ip_entries:
-        proprietary_id = entry['Proprietary Identifier']
-        # Write out results of previous title when getting to new title
-        if prev_id and prev_id != proprietary_id:
-            # Get info from all rows of country_entries with the same book id
-            country_info, country_title_requests = get_country_info(prev_id, country_entries)
-            # Check that the total title requests for 1 book from IP and Country reports are the same
-            assert total_title_requests == country_title_requests
-            all_results = add_result(prev_id, None, doi, isbn, book_title, grant, grant_number, publisher, begin_date,
-                                     end_date, total_title_requests, None, None, None, None, country_info,
-                                     location_info, '4', all_results)
+    for publisher_name in publishers:
+        ip_url += f'&frmPublisher={publisher_name}'
+        country_url += f'&frmPublisher={publisher_name}'
 
-            # Get info for new book title
-            book_title = entry['Title']
-            grant = entry['Grant']
-            grant_number = entry['Grant Number']
-            doi = entry['DOI']
-            isbn = entry['ISBN'].strip('ISBN ')
+        # get tsv files of reports and store results in list of dicts using csv dictreader
+        ip_entries, publisher, begin_date, end_date = download_tsv_file(ip_url, session)
+        if not ip_entries:
+            continue
+        country_entries, _, _, _ = download_tsv_file(country_url, session)
 
-            # Reset location info and total title requests
-            location_info = []
-            total_title_requests = 0
+        # set values for first book
+        book_title = ip_entries[0]['Title']
+        grant = ip_entries[0]['Grant']
+        grant_number = ip_entries[0]['Grant Number']
+        doi = ip_entries[0]['DOI']
+        isbn = ip_entries[0]['ISBN'].strip('ISBN ')
+        location_info = []
+        total_title_requests = 0
 
-        # Get location info
-        client_ip = entry['IP Address']
-        title_requests = entry['Reporting Period Total']
-        add_location_info(location_info, client_ip, geoip_client, title_requests=title_requests)
+        prev_id = None
+        # loop through clients in ip_entries
+        for entry in ip_entries:
+            proprietary_id = entry['Proprietary Identifier']
+            # Write out results of previous title when getting to new title
+            if prev_id and prev_id != proprietary_id:
+                # Get info from all rows of country_entries with the same book id
+                country_info, country_title_requests = get_country_info(prev_id, country_entries)
+                # Check that the total title requests for 1 book from IP and Country reports are the same
+                assert total_title_requests == country_title_requests
+                all_results = add_result(prev_id, None, doi, isbn, book_title, grant, grant_number, publisher, begin_date,
+                                         end_date, total_title_requests, None, None, None, None, country_info,
+                                         location_info, '4', all_results)
 
-        # Sum the title requests
-        total_title_requests += int(title_requests)
+                # Get info for new book title
+                book_title = entry['Title']
+                grant = entry['Grant']
+                grant_number = entry['Grant Number']
+                doi = entry['DOI']
+                isbn = entry['ISBN'].strip('ISBN ')
 
-        # Set the previous id
-        prev_id = proprietary_id
-        continue
+                # Reset location info and total title requests
+                location_info = []
+                total_title_requests = 0
 
-    # Add result of the last book title
-    country_info, country_title_requests = get_country_info(prev_id, country_entries)
-    assert total_title_requests == country_title_requests
-    all_results = add_result(prev_id, None, doi, isbn, book_title, grant, grant_number, publisher, begin_date,
-                             end_date, total_title_requests, None, None, None, None, country_info, location_info,
-                             '4', all_results)
+            # Get location info
+            client_ip = entry['IP Address']
+            title_requests = entry['Reporting Period Total']
+            add_location_info(location_info, client_ip, geoip_client, title_requests=title_requests)
+
+            # Sum the title requests
+            total_title_requests += int(title_requests)
+
+            # Set the previous id
+            prev_id = proprietary_id
+            continue
+
+        # Add result of the last book title
+        country_info, country_title_requests = get_country_info(prev_id, country_entries)
+        assert total_title_requests == country_title_requests
+        all_results = add_result(prev_id, None, doi, isbn, book_title, grant, grant_number, publisher, begin_date,
+                                 end_date, total_title_requests, None, None, None, None, country_info, location_info,
+                                 '4', all_results)
 
     logging.info(f'Found {len(all_results)} access stats entries')
     list_to_jsonl_gz(file_path, all_results)
@@ -319,6 +328,19 @@ def download_access_stats_new(file_path: str, release_date: str, username: str, 
                                  '5', all_results)
     logging.info(f'Found {len(all_results)} access stats entries')
     list_to_jsonl_gz(file_path, all_results)
+
+
+def list_all_publishers(url: str, session: Session) -> List[str]:
+    """
+
+    :param url:
+    :param session:
+    :return:
+    """
+    response = session.get(url)
+    soup = BeautifulSoup(response.text)
+    publishers = [match.text for match in soup.find('select', attrs={'name': 'frmPublisher'}).find_all('option')]
+    return publishers
 
 
 def download_tsv_file(url: str, session: Session) -> [List[dict], str, str, str]:
