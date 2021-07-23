@@ -71,8 +71,6 @@ def download(request):
         entries, unprocessed_publishers = download_access_stats_old(file_path, release_date, username, password,
                                                                     publisher_name, geoip_client, bucket_name,
                                                                     blob_name, unprocessed_publishers)
-    if not entries:
-        return
 
     # upload oapen access stats to bucket
     success = upload_file_to_storage_bucket(file_path, bucket_name, blob_name)
