@@ -1,0 +1,254 @@
+interactions:
+- request:
+    body: email=username&password=password&action=login
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '64'
+      Content-Type:
+      - application/x-www-form-urlencoded
+      User-Agent:
+      - python-requests/2.24.0
+    method: POST
+    uri: https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/?action=login
+  response:
+    body:
+      string: !!binary |
+        H4sIAAAAAAAAA61WXXPiNhR9Xn7FrR5KMwVkm3RTssadhKSTzORrkuy0fRS2wGpsyyvJEP59r/xB
+        iANpl9QPYElX55x77xlL/g9nt5PHv+7OITZpAndfT68uJ0D6lP4xnFB69ngGf148Xl+BO3DgwSgR
+        GkrPb0gHWg+JjcmPKV0ul4PlcCDVnD7e02eL6lqY+rWvS4xBZCISdPyS9DlNMj3eAuCORqNqH7FB
+        xwnL5mPCMwLrtwCF+DFnUVAq8o0wCQ8u778+9G9P7s5vfFrNVKuJyJ4gVnw27lo2jXQzmRk9mEs5
+        TzjLhR6EMqWh1r/NWCqS1fhMaqGPDx2nd+Q4XVA8GXe1WSVcx5ybLphVzsddw5+N3dXdn+g259nP
+        DywryYRhiQh7h99BmXLDwJL1+bdCLMYkREKemb4NJ1CPxqTcZ2v6BcKYKc3NuDCz/q+Ebmq3pOSF
+        lFTJkCYZoQo9+FvocMDCQfFEbcEnMtNFYsq1vmSYDl14VSTKJJVs0sgmUPL5tGmeP5XRCkSEIWzq
+        klpMJBbl3N3NUrE856peqJ718gWCcHXDFtc8K9YhfpG8RGNeECZMo9PCQimsBQl8Vuf1TgIkuJAp
+        9ykLfJqIoPPG+RsEgT+TKgUWGiGzMSGATYkl6sulRrrOJysY/z75IssLU5ckFlFkTZ2xFEfVZgIL
+        lhQ4TORcFsY2591dc2nkes/ubJomvzwnM8MVrGQBMVtwmIlMYMcjO6NAc61RDORoWc3RFClPpxhu
+        ZFuNLqapMGsFV3IOjWyflkn71NbG/tsqtkpHm07VwVuai5CS/GuQyLh+G/XKSGljET/2gmsmMrCm
+        QSN65eRaiW3nHv5osqkJTu9duOe5VEbvTTFVLtKcSvlUQ4ELPyHwwSbrd8GxNh4rAdn+iNM24rRE
+        nB7A5d3+oBNZZEatdmLX63sThG3ksEQOP6Q63KF6jf1R1VEbOSqRo4N3XOj9Dy70WryepfX29ozX
+        dqFXutDb34Ve24Ve6RTvQy70drjwBXtLP+vqdzq7vkL2tNs4y2yTqu9I1Z1mdhjcLrhiSQIPRZoy
+        tQKmgWHLD00MJ7kCz/Ec3DTc2ITnZ3PjaWZU4Js4ODHAYI53pxB5cIw/6m1cFFwanqJP8A1HzaEZ
+        McNI4Ho91xlWazt2n8lllkgWaShyPCngmql+pXIroNMbOb/0Dg9H/xHUxEJDireZeAfgkdvzPr8v
+        8VHi/QrWmDuA3J5z9Ll35HpbsHC0WeVXXX7V6d+lNJu3Fj/fCPsxlPnqC/bQHdoSuQ1Y/vaca159
+        ap1jj1F7hwv+AXQqgZDACwAA
+    headers:
+      Cache-Control:
+      - no-store, no-cache, must-revalidate
+      Connection:
+      - close
+      Content-Encoding:
+      - gzip
+      Content-Length:
+      - '987'
+      Content-Type:
+      - text/html; charset=UTF-8
+      Date:
+      - Fri, 23 Jul 2021 07:33:42 GMT
+      Expires:
+      - Thu, 19 Nov 1981 08:52:00 GMT
+      Pragma:
+      - no-cache
+      Server:
+      - Apache
+      Set-Cookie:
+      - PHPSESSID=t8kq4q47gl8kagbqvlqsmmd3j6; path=/
+      Vary:
+      - Accept-Encoding
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Cookie:
+      - PHPSESSID=t8kq4q47gl8kagbqvlqsmmd3j6
+      User-Agent:
+      - python-requests/2.24.0
+    method: GET
+    uri: https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/br1b/?frmRepository=1%7COAPEN+Library&frmFrom=2020-03-01&frmTo=2020-03-31&frmFormat=TSV&Go=Generate+Report&frmPublisher=Publisher1
+  response:
+    body:
+      string: "\"Book Report 1b (BR1b)\"\t\"Number of Successful Title Requests by
+        Month and Title\"\n\"Publisher1\"\n\"Period covered by Report:\"\n\"2020-03-01
+        to 2020-03-31\"\n\"Date Run:\"\n2021-07-23\nTitle\t\"IP Address\"\tGrant\t\"Grant
+        Number\"\tDOI\t\"Proprietary Identifier\"\tISBN\t\"Reporting Period Total\"\tMar-2020\n\"Totals
+        for all items\"\t\t\t\t\t\t\t19070\t19070\n\"Treat reason send message.\"\t55.190.159.229\t\t\t\t1495483\t\"ISBN
+        8061163562660\"\t4\t4\n\"Treat reason send message.\"\t207.43.205.128\t\t\t\t1495483\t\"ISBN
+        8061163562660\"\t1\t1\n\"Hope continue view call.\"\t100.229.139.139\t\t\t\t2962182\t\"ISBN
+        4880476387609\"\t1\t1\n"
+    headers:
+      Cache-Control:
+      - no-store, no-cache, must-revalidate
+      Connection:
+      - close
+      Content-Disposition:
+      - attachment; filename="OAPEN+Library_Publisher1_Mar-2020_Mar-2020.tsv"
+      Content-Type:
+      - text/tab-separated-values;charset=UTF-8
+      Date:
+      - Fri, 23 Jul 2021 07:33:50 GMT
+      Expires:
+      - Thu, 19 Nov 1981 08:52:00 GMT
+      Pragma:
+      - no-cache
+      Server:
+      - Apache
+      Transfer-Encoding:
+      - chunked
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Cookie:
+      - PHPSESSID=t8kq4q47gl8kagbqvlqsmmd3j6
+      User-Agent:
+      - python-requests/2.24.0
+    method: GET
+    uri: https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/br1bCountry/?frmRepository=1%7COAPEN+Library&frmoapenid=&frmFrom=2020-03-01&frmTo=2020-03-31&frmFormat=TSV&Go=Generate+Report&frmPublisher=Publisher1
+  response:
+    body:
+      string: "\"Book Report 1b (BR1b)\"\t\"Number of Successful Title Requests by
+        Month and Title\"\n\"Publisher1\"\n\"Period covered by Report:\"\n\"2020-03-01
+        to 2020-03-31\"\n\"Date Run:\"\n2021-07-23\nTitle\tCountry\tGrant\t\"Grant
+        Number\"\tDOI\t\"Proprietary Identifier\"\tISBN\t\"Reporting Period Total\"\tMar-2020\n\"Totals
+        for all items\"\t\t\t\t\t\t\t19070\t19070\n\"Treat reason
+        send message.\"\tFrance\t\t\t\t1495483\t\"ISBN 8061163562660\"\t4\t4\n\"Treat reason
+        send message.\"\tNorway\t\t\t\t1495483\t\"ISBN 8061163562660\"\t1\t1\n\"Hope continue
+        view call.\"\tDenmark\t\t\t\t2962182\t\"ISBN 4880476387609\"\t1\t1\n"
+    headers:
+      Cache-Control:
+      - no-store, no-cache, must-revalidate
+      Connection:
+      - close
+      Content-Disposition:
+      - attachment; filename="OAPEN+Library_Publisher1_Mar-2020_Mar-2020.tsv"
+      Content-Type:
+      - text/tab-separated-values;charset=UTF-8
+      Date:
+      - Fri, 23 Jul 2021 07:34:17 GMT
+      Expires:
+      - Thu, 19 Nov 1981 08:52:00 GMT
+      Pragma:
+      - no-cache
+      Server:
+      - Apache
+      Transfer-Encoding:
+      - chunked
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Cookie:
+      - PHPSESSID=t8kq4q47gl8kagbqvlqsmmd3j6
+      User-Agent:
+      - python-requests/2.24.0
+    method: GET
+    uri: https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/br1b/?frmRepository=1%7COAPEN+Library&frmFrom=2020-03-01&frmTo=2020-03-31&frmFormat=TSV&Go=Generate+Report&frmPublisher=Publisher2
+  response:
+    body:
+      string: "\"Book Report 1b (BR1b)\"\t\"Number of Successful Title Requests by
+        Month and Title\"\n\"Publisher2\"\n\"Period covered by Report:\"\n\"2020-03-01
+        to 2020-03-31\"\n\"Date Run:\"\n2021-07-23\nTitle\t\"IP Address\"\tGrant\t\"Grant
+        Number\"\tDOI\t\"Proprietary Identifier\"\tISBN\t\"Reporting Period Total\"\tMar-2020\n\"Totals
+        for all items\"\t\t\t\t\t\t\t19070\t19070\n\"Treat reason send message.\"\t55.190.159.229\t\t\t\t1495483\t\"ISBN
+        8061163562660\"\t4\t4\n\"Treat reason send message.\"\t207.43.205.128\t\t\t\t1495483\t\"ISBN
+        8061163562660\"\t1\t1\n\"Hope continue view call.\"\t100.229.139.139\t\t\t\t2962182\t\"ISBN
+        4880476387609\"\t1\t1\n"
+    headers:
+      Cache-Control:
+      - no-store, no-cache, must-revalidate
+      Connection:
+      - close
+      Content-Disposition:
+      - attachment; filename="OAPEN+Library_Publisher2_Mar-2020_Mar-2020.tsv"
+      Content-Type:
+      - text/tab-separated-values;charset=UTF-8
+      Date:
+      - Fri, 23 Jul 2021 07:33:50 GMT
+      Expires:
+      - Thu, 19 Nov 1981 08:52:00 GMT
+      Pragma:
+      - no-cache
+      Server:
+      - Apache
+      Transfer-Encoding:
+      - chunked
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Cookie:
+      - PHPSESSID=t8kq4q47gl8kagbqvlqsmmd3j6
+      User-Agent:
+      - python-requests/2.24.0
+    method: GET
+    uri: https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/br1bCountry/?frmRepository=1%7COAPEN+Library&frmoapenid=&frmFrom=2020-03-01&frmTo=2020-03-31&frmFormat=TSV&Go=Generate+Report&frmPublisher=Publisher2
+  response:
+    body:
+      string: "\"Book Report 1b (BR1b)\"\t\"Number of Successful Title Requests by
+        Month and Title\"\n\"Publisher2\"\n\"Period covered by Report:\"\n\"2020-03-01
+        to 2020-03-31\"\n\"Date Run:\"\n2021-07-23\nTitle\tCountry\tGrant\t\"Grant
+        Number\"\tDOI\t\"Proprietary Identifier\"\tISBN\t\"Reporting Period Total\"\tMar-2020\n\"Totals
+        for all items\"\t\t\t\t\t\t\t19070\t19070\n\"Treat reason
+        send message.\"\tFrance\t\t\t\t1495483\t\"ISBN 8061163562660\"\t4\t4\n\"Treat reason
+        send message.\"\tNorway\t\t\t\t1495483\t\"ISBN 8061163562660\"\t1\t1\n\"Hope continue
+        view call.\"\tDenmark\t\t\t\t2962182\t\"ISBN 4880476387609\"\t1\t1\n"
+    headers:
+      Cache-Control:
+      - no-store, no-cache, must-revalidate
+      Connection:
+      - close
+      Content-Disposition:
+      - attachment; filename="OAPEN+Library_Publisher2_Mar-2020_Mar-2020.tsv"
+      Content-Type:
+      - text/tab-separated-values;charset=UTF-8
+      Date:
+      - Fri, 23 Jul 2021 07:34:17 GMT
+      Expires:
+      - Thu, 19 Nov 1981 08:52:00 GMT
+      Pragma:
+      - no-cache
+      Server:
+      - Apache
+      Transfer-Encoding:
+      - chunked
+    status:
+      code: 200
+      message: OK
+version: 1

@@ -3,3 +3,4 @@ flake8==3.8.*
 coverage==5.2
 httpretty==1.0.*
 click==7.1.*
+vcrpy==4.0.*

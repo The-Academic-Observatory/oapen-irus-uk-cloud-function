@@ -25,6 +25,7 @@ from unittest.mock import Mock, patch
 
 import geoip2.database
 import httpretty
+import vcr
 from click.testing import CliRunner
 from geoip2.errors import AddressNotFoundError
 from google.cloud import storage
@@ -45,9 +46,12 @@ class TestCloudFunction(unittest.TestCase):
 
         super(TestCloudFunction, self).__init__(*args, **kwargs)
 
-        self.download_path_v4_country = test_fixtures_path('download_country_2020_03.tsv')
-        self.download_path_v4_ip = test_fixtures_path('download_ip_2020_03.tsv')
-        self.download_hash_v4 = '04fe8f3f'
+        self.download_path_v4_empty_publisher = test_fixtures_path('download_empty_publisher_2020_03.tsv')
+        self.download_path_v4_publisher = test_fixtures_path('download_publisher_2020_03.tsv')
+        self.download_hash_v4_publisher = '04fe8f3f'
+        self.download_path_v4_all_publishers = test_fixtures_path('download_all_publishers_2020_03.tsv')
+        self.download_hash_v4_all_publishers = 'd78c7192'
+        self.download_hash_v4_unprocessed_publishers = 'c6953306'
 
         self.download_path_v5_base = test_fixtures_path('download_base_2020_04.json')
         self.download_path_v5_base_error = test_fixtures_path('download_base_error_2020_04.json')
@@ -132,62 +136,163 @@ class TestCloudFunction(unittest.TestCase):
             self.assertTrue(os.path.isfile(download_path))
             self.assertTrue(os.path.isfile(extract_path))
 
+    @patch('main.replace_ip_address')
+    @patch('main.get_all_publishers')
+    @patch('main.get_existing_results')
+    def test_download_access_stats_old(self, mock_get_results, mock_get_publishers, mock_replace_ip):
+        """ Test downloading access stats before April 2020 """
+        mock_replace_ip.return_value = ('23.1194', '-82.392', 'Suva', 'Peru', 'PE')
+        mock_get_publishers.return_value = ['Publisher1', 'Publisher2']
+        mock_get_results.return_value = [{'proprietary_id': '1495483', 'URI': None, 'DOI': None,
+                                          'ISBN': '8061163562660', 'book_title': 'Treat reason send message.',
+                                          'grant': None, 'grant_number': None, 'publisher': 'Publisher Name',
+                                          'begin_date': '2020-03-01', 'end_date': '2020-03-31', 'title_requests': 5,
+                                          'total_item_investigations': None, 'total_item_requests': None,
+                                          'unique_item_investigations': None, 'unique_item_requests': None,
+                                          'country': [{'name': 'France', 'code': '', 'title_requests': '4',
+                                                       'total_item_investigations': None, 'total_item_requests': None,
+                                                       'unique_item_investigations': None,
+                                                       'unique_item_requests': None},
+                                                      {'name': 'Norway', 'code': '', 'title_requests': '1',
+                                                       'total_item_investigations': None, 'total_item_requests': None,
+                                                       'unique_item_investigations': None,
+                                                       'unique_item_requests': None}],
+                                          'locations': [{'latitude': '23.1194', 'longitude': '-82.392', 'city': 'Suva',
+                                                         'country_name': 'Peru', 'country_code': 'PE',
+                                                         'title_requests': '4', 'total_item_investigations': None,
+                                                         'total_item_requests': None,
+                                                         'unique_item_investigations': None,
+                                                         'unique_item_requests': None},
+                                                        {'latitude': '23.1194', 'longitude': '-82.392', 'city': 'Suva',
+                                                         'country_name': 'Peru', 'country_code': 'PE',
+                                                         'title_requests': '1', 'total_item_investigations': None,
+                                                         'total_item_requests': None,
+                                                         'unique_item_investigations': None,
+                                                         'unique_item_requests': None}], 'version': '4'},
+                                         {'proprietary_id': '2962182', 'URI': None, 'DOI': None,
+                                          'ISBN': '4880476387609', 'book_title': 'Hope continue view call.',
+                                          'grant': None, 'grant_number': None, 'publisher': 'Publisher Name',
+                                          'begin_date': '2020-03-01', 'end_date': '2020-03-31', 'title_requests': 1,
+                                          'total_item_investigations': None, 'total_item_requests': None,
+                                          'unique_item_investigations': None, 'unique_item_requests': None,
+                                          'country': [{'name': 'Denmark', 'code': '', 'title_requests': '1',
+                                                       'total_item_investigations': None, 'total_item_requests': None,
+                                                       'unique_item_investigations': None,
+                                                       'unique_item_requests': None}],
+                                          'locations': [{'latitude': '23.1194', 'longitude': '-82.392', 'city': 'Suva',
+                                                         'country_name': 'Peru', 'country_code': 'PE',
+                                                         'title_requests': '1', 'total_item_investigations': None,
+                                                         'total_item_requests': None,
+                                                         'unique_item_investigations': None,
+                                                         'unique_item_requests': None}],
+                                          'version': '4'}]
+        with CliRunner().isolated_filesystem():
+            file_path = 'oapen_access_stats.jsonl.gz'
+            release_date = '2020-03'
+
+            # Test with a given publisher name
+            with vcr.use_cassette(self.download_path_v4_publisher):
+                entries, publishers = download_access_stats_old(file_path, release_date, 'username', 'password',
+                                                                'Publisher Name', Mock(spec=geoip2.database.Reader),
+                                                                'bucket', 'blob')
+                self.assertEqual(2, entries)
+                self.assertEqual([], publishers)
+                actual_hash = gzip_file_crc(file_path)
+                self.assertEqual(self.download_hash_v4_publisher, actual_hash)
+
+            # Test with a given publisher name, but no entries for that publisher
+            with vcr.use_cassette(self.download_path_v4_empty_publisher):
+                entries, publishers = download_access_stats_old(file_path, release_date, 'username', 'password',
+                                                                'Empty Publisher', Mock(spec=geoip2.database.Reader),
+                                                                'bucket', 'blob')
+                self.assertEqual(0, entries)
+                self.assertEqual([], publishers)
+                actual_hash = gzip_file_crc(file_path)
+                self.assertEqual('00000000', actual_hash)
+
+            # Test when no publisher name is given and no unprocessed_publishers (all publishers are downloaded)
+            with vcr.use_cassette(self.download_path_v4_all_publishers):
+                entries, publishers = download_access_stats_old(file_path, release_date, 'username', 'password', '',
+                                                                Mock(spec=geoip2.database.Reader), 'bucket', 'blob')
+                self.assertEqual(4, entries)
+                self.assertEqual([], publishers)
+                actual_hash = gzip_file_crc(file_path)
+                self.assertEqual(self.download_hash_v4_all_publishers, actual_hash)
+
+            # Test when no publisher name is given with a list of unprocessed_publishers
+            with vcr.use_cassette(self.download_path_v4_all_publishers):
+                entries, publishers = download_access_stats_old(file_path, release_date, 'username', 'password', '',
+                                                                Mock(spec=geoip2.database.Reader), 'bucket', 'blob',
+                                                                ['Publisher1', 'Publisher2'])
+                self.assertEqual(6, entries)
+                self.assertEqual([], publishers)
+                actual_hash = gzip_file_crc(file_path)
+                self.assertEqual(self.download_hash_v4_unprocessed_publishers, actual_hash)
+
+            # Test response status that is not 200 for login
+            with httpretty.enabled():
+                httpretty.register_uri(httpretty.POST,
+                                       uri='https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/?action=login',
+                                       status=400)
+                with self.assertRaises(RuntimeError):
+                    download_access_stats_old(file_path, release_date, 'username', 'password', '',
+                                              Mock(spec=geoip2.database.Reader), 'bucket', 'blob')
+
     # @patch('main.replace_ip_address')
     # def test_download_access_stats_old(self, mock_replace_ip):
     #     """ Test downloading access stats before April 2020 """
     #     mock_replace_ip.return_value = ('23.1194', '-82.392', 'Suva', 'Peru', 'PE')
     #     # Test with and without publisher name
-    #     for publisher_name in ['', 'publisher%20name']:
-    #         with CliRunner().isolated_filesystem():
-    #             file_path = 'oapen_access_stats.jsonl.gz'
-    #             release_date = '2020-03'
-    #             start_date = release_date + "-01"
-    #             end_date = release_date + "-31"
+    #     with CliRunner().isolated_filesystem():
+    #         file_path = 'oapen_access_stats.jsonl.gz'
+    #         release_date = '2020-03'
+    #         start_date = release_date + "-01"
+    #         end_date = release_date + "-31"
     #
-    #             ip_url = f'https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/br1b/?frmRepository=1%7COAPEN+Library' \
-    #                      f'&frmFrom={start_date}&frmTo={end_date}&frmFormat=TSV&Go=Generate+Report'
-    #             country_url = f'https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/br1bCountry/?frmRepository=1%7COAPEN+Library' \
-    #                           f'&frmoapenid=&frmFrom={start_date}&frmTo={end_date}&frmFormat=TSV' \
-    #                           f'&Go=Generate+Report'
-    #             if publisher_name:
-    #                 ip_url += f'&frmPublisher={publisher_name}'
-    #                 country_url += f'&frmPublisher={publisher_name}'
+    #         ip_url = f'https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/br1b/?frmRepository=1%7COAPEN+Library' \
+    #                  f'&frmFrom={start_date}&frmTo={end_date}&frmFormat=TSV&Go=Generate+Report'
+    #         country_url = f'https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/br1bCountry/?frmRepository=1%7COAPEN+Library' \
+    #                       f'&frmoapenid=&frmFrom={start_date}&frmTo={end_date}&frmFormat=TSV' \
+    #                       f'&Go=Generate+Report'
+    #         if publisher_name:
+    #             ip_url += f'&frmPublisher={publisher_name}'
+    #             country_url += f'&frmPublisher={publisher_name}'
     #
-    #             with httpretty.enabled():
-    #                 # register login page
-    #                 httpretty.register_uri(httpretty.POST,
-    #                                        uri='https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/?action=login',
-    #                                        body='After you have finished your session please remember to')
-    #                 # register ip report
-    #                 with open(self.download_path_v4_ip, 'rb') as f:
-    #                     body = f.read()
-    #                 httpretty.register_uri(httpretty.GET, uri=ip_url, body=body)
+    #         with httpretty.enabled():
+    #             # register login page
+    #             httpretty.register_uri(httpretty.POST,
+    #                                    uri='https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/?action=login',
+    #                                    body='After you have finished your session please remember to')
+    #             # register ip report
+    #             with open(self.download_path_v4_ip, 'rb') as f:
+    #                 body = f.read()
+    #             httpretty.register_uri(httpretty.GET, uri=ip_url, body=body)
     #
-    #                 # register country report
-    #                 with open(self.download_path_v4_country, 'rb') as f:
-    #                     body = f.read()
-    #                 httpretty.register_uri(httpretty.GET, uri=country_url, body=body)
+    #             # register country report
+    #             with open(self.download_path_v4_country, 'rb') as f:
+    #                 body = f.read()
+    #             httpretty.register_uri(httpretty.GET, uri=country_url, body=body)
     #
-    #                 # download access stats
+    #             # download access stats
+    #             download_access_stats_old(file_path, release_date, 'username', 'password', publisher_name,
+    #                                       Mock(spec=geoip2.database.Reader))
+    #             actual_hash = gzip_file_crc(file_path)
+    #             self.assertEqual(self.download_hash_v4, actual_hash)
+    #
+    #             # Test response status that is not 200
+    #             httpretty.register_uri(httpretty.GET, uri=ip_url, status=400)
+    #             with self.assertRaises(RuntimeError):
     #                 download_access_stats_old(file_path, release_date, 'username', 'password', publisher_name,
     #                                           Mock(spec=geoip2.database.Reader))
-    #                 actual_hash = gzip_file_crc(file_path)
-    #                 self.assertEqual(self.download_hash_v4, actual_hash)
     #
-    #                 # Test response status that is not 200
-    #                 httpretty.register_uri(httpretty.GET, uri=ip_url, status=400)
-    #                 with self.assertRaises(RuntimeError):
-    #                     download_access_stats_old(file_path, release_date, 'username', 'password', publisher_name,
-    #                                               Mock(spec=geoip2.database.Reader))
-    #
-    #             # Test response status that is not 200 for login
-    #             with httpretty.enabled():
-    #                 httpretty.register_uri(httpretty.POST,
-    #                                        uri='https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/?action=login',
-    #                                        status=400)
-    #                 with self.assertRaises(RuntimeError):
-    #                     download_access_stats_old(file_path, release_date, 'username', 'password', publisher_name,
-    #                                               Mock(spec=geoip2.database.Reader))
+    #         # Test response status that is not 200 for login
+    #         with httpretty.enabled():
+    #             httpretty.register_uri(httpretty.POST,
+    #                                    uri='https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/?action=login',
+    #                                    status=400)
+    #             with self.assertRaises(RuntimeError):
+    #                 download_access_stats_old(file_path, release_date, 'username', 'password', publisher_name,
+    #                                           Mock(spec=geoip2.database.Reader))
 
     @patch('main.replace_ip_address')
     def test_download_access_stats_new(self, mock_replace_ip):
