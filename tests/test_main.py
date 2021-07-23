@@ -16,12 +16,13 @@
 
 import os
 import pathlib
+import requests
 import subprocess
 import unittest
 import uuid
 from subprocess import Popen
 from types import SimpleNamespace
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, patch, PropertyMock
 
 import geoip2.database
 import httpretty
@@ -32,7 +33,8 @@ from google.cloud import storage
 
 import tests.fixtures
 from main import (download, download_access_stats_new, download_access_stats_old, download_geoip,
-                  list_to_jsonl_gz, replace_ip_address, upload_file_to_storage_bucket)
+                  get_all_publishers, get_existing_results, list_to_jsonl_gz, replace_ip_address,
+                  upload_file_to_storage_bucket)
 
 
 class TestCloudFunction(unittest.TestCase):
@@ -136,6 +138,48 @@ class TestCloudFunction(unittest.TestCase):
             self.assertTrue(os.path.isfile(download_path))
             self.assertTrue(os.path.isfile(extract_path))
 
+    @patch('main.download_file_from_storage_bucket')
+    def test_get_existing_results(self, mock_download_bucket):
+        """ Test downloading existing results from bucket """
+        with CliRunner().isolated_filesystem():
+            file_path = 'file.jsonl.gz'
+            # fake downloading file from bucket
+            list_to_jsonl_gz(file_path, [{'entry1': 'test'}, {'entry2': 'test'}])
+
+            all_results = get_existing_results(file_path, 'bucket', 'blob')
+            mock_download_bucket.assert_called_once_with(file_path, 'bucket', 'blob')
+            self.assertListEqual([{'entry1': 'test'}, {'entry2': 'test'}], all_results)
+
+    @patch('main.requests.session')
+    def test_get_all_publishers(self, mock_session):
+        """ Test listing all publishers """
+        def res():
+            r = requests.Response()
+            type(r).text = PropertyMock(return_value=
+                                        """
+                                        <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+                                           "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+                                        <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+                                           <head>
+                                              <link href='https://fonts.googleapis.com/css?family=Dosis:400,700' rel='stylesheet' type='text/css'>
+                                              <link href='https://fonts.googleapis.com/css?family=Open+Sans:400italic,400' rel='stylesheet' type='text/css'>
+                                              <title>IRUS-OAPEN</title>
+                                              <meta http-equiv="content-type" content="text/html; charset=utf-8"/>
+                                              <link rel="stylesheet" href="https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/irus.css" type="text/css" />
+                                           </head>
+                                           <body>
+                                              <select name='frmPublisher'>
+                                                 <option value="Publisher 1">Publisher 1</option>
+                                                 <option value="Publisher 2">Publisher 2</option>
+                                              </select>
+                                           </body>
+                                        </html>
+                                        """)
+            return r
+        mock_session.get.return_value = res()
+        publishers = get_all_publishers('url', mock_session)
+        self.assertListEqual(['Publisher%201', 'Publisher%202'], publishers)
+
     @patch('main.replace_ip_address')
     @patch('main.get_all_publishers')
     @patch('main.get_existing_results')
@@ -229,14 +273,31 @@ class TestCloudFunction(unittest.TestCase):
                 actual_hash = gzip_file_crc(file_path)
                 self.assertEqual(self.download_hash_v4_unprocessed_publishers, actual_hash)
 
-            # Test response status that is not 200 for login
             with httpretty.enabled():
+                # register login page
+                httpretty.register_uri(httpretty.POST,
+                                       uri='https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/?action=login',
+                                       body='After you have finished your session please remember to')
+
+                # Test response status that is not 200
+                start_date = release_date + "-01"
+                end_date = release_date + "-31"
+                ip_url = f'https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/br1b/?frmRepository=1%7COAPEN+Library' \
+                         f'&frmFrom={start_date}&frmTo={end_date}&frmFormat=TSV&Go=Generate+Report&frmPublisher=error'
+                httpretty.register_uri(httpretty.GET, uri=ip_url, status=400)
+                with self.assertRaises(RuntimeError):
+                    download_access_stats_old(file_path, release_date, 'username', 'password', 'error',
+                                              Mock(spec=geoip2.database.Reader), 'bucket', 'blob')
+
+            with httpretty.enabled():
+                # Test response status that is not 200 for login
                 httpretty.register_uri(httpretty.POST,
                                        uri='https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/?action=login',
                                        status=400)
                 with self.assertRaises(RuntimeError):
                     download_access_stats_old(file_path, release_date, 'username', 'password', '',
                                               Mock(spec=geoip2.database.Reader), 'bucket', 'blob')
+
 
     # @patch('main.replace_ip_address')
     # def test_download_access_stats_old(self, mock_replace_ip):
@@ -293,7 +354,6 @@ class TestCloudFunction(unittest.TestCase):
     #             with self.assertRaises(RuntimeError):
     #                 download_access_stats_old(file_path, release_date, 'username', 'password', publisher_name,
     #                                           Mock(spec=geoip2.database.Reader))
-
     @patch('main.replace_ip_address')
     def test_download_access_stats_new(self, mock_replace_ip):
         """ Test downloading access stats since April 2020 """
