@@ -35,6 +35,7 @@ from bs4 import BeautifulSoup
 from geoip2.errors import AddressNotFoundError
 from google.cloud import storage
 from requests import Session
+from urllib.parse import quote
 
 
 def download(request):
@@ -43,8 +44,6 @@ def download(request):
     :param request: (flask.Request): HTTP request object.
     :return: None.
     """
-    global start_time
-    start_time = time.time()
     request_json = request.get_json()
     release_date = request_json.get('release_date')  # 'YYYY-MM'
     username = request_json.get('username')
@@ -52,6 +51,7 @@ def download(request):
     geoip_license_key = request_json.get('geoip_license_key')
     publisher_name = request_json.get('publisher_name')  # e.g. 'UCL+Press'
     publisher_uuid = request_json.get('publisher_uuid')  # e.g. 'df73bf94-b818-494c-a8dd-6775b0573bc2'
+    unprocessed_publishers = request_json.get('unprocessed_publishers')
     bucket_name = request_json.get('bucket_name')
     blob_name = request_json.get('blob_name')
 
@@ -65,22 +65,22 @@ def download(request):
     file_path = '/tmp/oapen_access_stats.jsonl.gz'
     logging.info(f'Downloading oapen access stats for month: {release_date}, publisher name: {publisher_name}, '
                  f'publisher UUID: {publisher_uuid}')
-    finished = True
     if datetime.strptime(release_date, '%Y-%m') >= datetime(2020, 4, 1):
         entries = download_access_stats_new(file_path, release_date, username, password, publisher_uuid, geoip_client)
     else:
-        entries, finished = download_access_stats_old(file_path, release_date, username, password, publisher_name,
-                                                      geoip_client)
+        entries, unprocessed_publishers = download_access_stats_old(file_path, release_date, username, password,
+                                                                    publisher_name, geoip_client, bucket_name,
+                                                                    blob_name, unprocessed_publishers)
     if not entries:
         return
 
-    # upload oapen access stats to bucket if finished for all publishers (in case no publisher is specified)
-    if finished:
-        success = upload_file_to_storage_bucket(file_path, bucket_name, blob_name)
-        if not success:
-            raise RuntimeError('Uploading file to storage bucket unsuccessful')
+    # upload oapen access stats to bucket
+    success = upload_file_to_storage_bucket(file_path, bucket_name, blob_name)
+    if not success:
+        raise RuntimeError('Uploading file to storage bucket unsuccessful')
 
-    return finished
+    data = {'entries': entries, 'unprocessed_publishers': unprocessed_publishers}
+    return json.dumps(data), 200, {'Content-Type': 'application/json'}
 
 
 def download_geoip(geoip_license_key: str, download_path: str, extract_path: str):
@@ -114,10 +114,15 @@ def download_geoip(geoip_license_key: str, download_path: str, extract_path: str
 
 
 def download_access_stats_old(file_path: str, release_date: str, username: str, password: str, publisher_name: str,
-                              geoip_client: geoip2.database.Reader) -> [bool, bool]:
+                              geoip_client: geoip2.database.Reader, bucket_name: str, blob_name: str,
+                              unprocessed_publishers: list = None) -> [int, bool]:
     """ Download the oapen irus uk access stats data and replace IP addresses with geographical information.
     Data is downloaded from both BR1b IP and BR1b Country reports, these are COUNTER 4 reports. The results for each
     book from both reports are merged into one result dictionary.
+    When no publisher_name is given it will first get a list of all available publishers and download the reports for
+    each publisher 1 by 1. This might take longer than the max timeout, so the loop is terminated after a specific time
+    and the results so far are uploaded to the storage bucket. The next time the function is called with a list of
+    unprocessed publishers and it will append to the previous results.
 
     :param file_path: Path to store the access stats results.
     :param release_date: Release date ('YYYY-MM')
@@ -125,7 +130,10 @@ def download_access_stats_old(file_path: str, release_date: str, username: str, 
     :param password: OAPEN password
     :param publisher_name: Publisher name
     :param geoip_client: Geoip client
-    :return: Whether to continue or not
+    :param bucket_name: The Google Cloud storage bucket name
+    :param blob_name: The Google Cloud storage blob name
+    :param unprocessed_publishers: List of remaining publishers to be processed (when no publisher name is specified)
+    :return: The number of access stats entries and a list of unprocessed publishers
     """
     # get last date of month
     year, month = release_date.split('-')
@@ -133,11 +141,10 @@ def download_access_stats_old(file_path: str, release_date: str, username: str, 
 
     start_date = release_date + "-01"
     end_date = release_date + "-" + last_date_month
-    ip_url = f'https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/br1b/?frmRepository=1%7COAPEN+Library' \
-             f'&frmFrom={start_date}&frmTo={end_date}&frmFormat=TSV&Go=Generate+Report'
-    country_url = f'https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/br1bCountry/?frmRepository=1%7COAPEN+Library' \
-                  f'&frmoapenid=&frmFrom={start_date}&frmTo={end_date}&frmFormat=TSV' \
-                  f'&Go=Generate+Report'
+    ip_base_url = f'https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/br1b/?frmRepository=1%7COAPEN+Library' \
+                  f'&frmFrom={start_date}&frmTo={end_date}&frmFormat=TSV&Go=Generate+Report'
+    country_base_url = f'https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/br1bCountry/?frmRepository=1%7COAPEN' \
+                       f'+Library&frmoapenid=&frmFrom={start_date}&frmTo={end_date}&frmFormat=TSV&Go=Generate+Report'
 
     # start a requests session
     session = requests.Session()
@@ -153,29 +160,33 @@ def download_access_stats_old(file_path: str, release_date: str, username: str, 
     else:
         raise RuntimeError(f'Login at https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/?action=login unsuccessful')
 
+    all_results = []
     # Get list of all publisher names
-    publishers_path = '/tmp/publishers/txt'
     if publisher_name:
         publishers = [publisher_name]
-        all_results = []
     else:
-        publishers, all_results = continue_unprocessed_publishers(ip_url, session, publishers_path, file_path)
+        if unprocessed_publishers:
+            publishers = unprocessed_publishers
+            all_results = get_existing_results(file_path, bucket_name, blob_name)
+        else:
+            publishers = get_all_publishers(ip_base_url, session)
 
     # loop through publishers
+    start_time = time.time()
     for publisher_name in publishers[:]:
-        # break after 400s and when at least 1 publisher has been processed to keep enough time left to upload data to
+        # when at least 1 publisher has been processed, break after 400s to keep enough time left to upload data to
         # bucket (timeout = 540s)
         if time.time() - start_time > 400 and all_results:
             break
         publishers.remove(publisher_name)
-        ip_url += f'&frmPublisher={publisher_name}'
-        country_url += f'&frmPublisher={publisher_name}'
+        ip_url = ip_base_url + f'&frmPublisher={publisher_name}'
+        country_url = country_base_url + f'&frmPublisher={publisher_name}'
 
         # get tsv files of reports and store results in list of dicts using csv dictreader
         ip_entries, publisher, begin_date, end_date = download_tsv_file(ip_url, session)
         if not ip_entries:
             logging.info(f'No access stats entries available for {publisher} in {release_date}')
-            return False
+            continue
         country_entries, _, _, _ = download_tsv_file(country_url, session)
 
         # set values for first book
@@ -231,23 +242,13 @@ def download_access_stats_old(file_path: str, release_date: str, username: str, 
                                  end_date, total_title_requests, None, None, None, None, country_info, location_info,
                                  '4', all_results)
 
-    logging.info(f'Found {len(all_results)} access stats entries, {len(publishers)} publishers remaining')
-
-    # Write names of remaining publishers to file
-    if publishers:
-        with open(publishers_path, 'w') as f:
-            f.writelines('\n'.join(publishers))
-    # Delete file if there are no remaining publishers
-    else:
-        if os.path.exists(publishers_path):
-            os.remove(publishers_path)
-
+    logging.info(f'Total {len(all_results)} access stats entries, {len(publishers)} publishers remaining')
     list_to_jsonl_gz(file_path, all_results)
-    return True, len(publishers) == 0
+    return len(all_results), publishers
 
 
 def download_access_stats_new(file_path: str, release_date: str, username: str, password: str, publisher_uuid: str,
-                              geoip_client: geoip2.database.Reader) -> bool:
+                              geoip_client: geoip2.database.Reader) -> int:
     """ Download the oapen irus uk access stats data and replace IP addresses with geographical information.
     The API is queried 3 times. Once without any attributes, once with the country attribute and once with the IP
     attribute. The results of these queries are merged into one result dictionary.
@@ -258,7 +259,7 @@ def download_access_stats_new(file_path: str, release_date: str, username: str, 
     :param password: OAPEN API Key
     :param publisher_uuid: UUID of publisher
     :param geoip_client: Geoip client
-    :return: Whether to continue or not.
+    :return: The number of access stats entries
     """
     # Create urls
     requestor_id = username
@@ -359,35 +360,38 @@ def download_access_stats_new(file_path: str, release_date: str, username: str, 
                                  '5', all_results)
     logging.info(f'Found {len(all_results)} access stats entries')
     list_to_jsonl_gz(file_path, all_results)
-    return len(all_results) > 0
+    return len(all_results)
 
 
-def continue_unprocessed_publishers(url: str, session: Session, publishers_path: str, results_path: str) \
-        -> [List[str], List[dict]]:
+def get_existing_results(results_path: str, bucket_name: str, blob_name: str) -> List[dict]:
+    """ Get the existing results from a previous execution of this Cloud Function. The results are retrieved from a
+    blob in a Google Cloud Storage bucket.
+
+    :param results_path: The local path file to store the existing results
+    :param bucket_name: The Google Cloud storage bucket name
+    :param blob_name: The Google Cloud storage blob name
+    :return: A list with dictionaries of results
     """
-    :param publishers_path:
-    :param url:
-    :param session:
-    :param results_path:
-    :return:
+    logging.info('Getting results data downloaded for publishers so far')
+    download_file_from_storage_bucket(results_path, bucket_name, blob_name)
+    with gzip.open(results_path, 'r') as f:
+        all_results = [json.loads(line) for line in f]
+    return all_results
+
+
+def get_all_publishers(url: str, session: Session) -> List[str]:
+    """ Get a list of all publishers available in the portal.
+
+    :param url: The URL used to get a dropdown list with publishers as options
+    :param session: The requests session.
+    :return: A list with all available publisher names
     """
-    if os.path.exists(publishers_path):
-        logging.info('Continuing with unprocessed publishers')
-        # Get names of unprocessed publishers
-        with open(publishers_path, 'r') as f:
-            publishers = f.read().splitlines()
-        # Get results data so far
-        with gzip.open(results_path, 'r') as f:
-            all_results = [json.loads(line) for line in f]
-    else:
-        logging.info('Getting list of all available publishers')
-        # Get all available publishers from portal
-        response = session.get(url)
-        soup = BeautifulSoup(response.text)
-        publishers = [match.text for match in soup.find('select', attrs={'name': 'frmPublisher'}).find_all('option')]
-        # Set results data empty
-        all_results = []
-    return publishers, all_results
+    logging.info('Getting list of all available publishers')
+    # Get all available publishers from portal
+    response = session.get(url)
+    soup = BeautifulSoup(response.text, features="html.parser")
+    publishers = [quote(match.text) for match in soup.find('select', attrs={'name': 'frmPublisher'}).find_all('option')]
+    return publishers
 
 
 def download_tsv_file(url: str, session: Session) -> [List[dict], str, str, str]:
@@ -635,3 +639,14 @@ def upload_file_to_storage_bucket(file_path: str, bucket_name: str, blob_name: s
     blob.upload_from_filename(file_path)
 
     return True if blob.exists() else False
+
+
+def download_file_from_storage_bucket(file_path: str, bucket_name: str, blob_name: str) -> bool:
+    storage_client = storage.Client()
+    bucket = storage_client.bucket(bucket_name)
+    blob = bucket.blob(blob_name)
+
+    logging.info(f'Downloading file to "{file_path}". Blob: {blob_name}, bucket: {bucket_name}')
+    blob.download_to_filename(file_path)
+
+    return True if os.path.exists(file_path) else False
