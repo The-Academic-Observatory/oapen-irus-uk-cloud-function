@@ -154,7 +154,7 @@ class TestCloudFunction(unittest.TestCase):
     def test_get_all_publishers(self, mock_session):
         """ Test listing all publishers """
         def res():
-            r = requests.Response()
+            r = Mock(spec=requests.Response)
             type(r).text = PropertyMock(return_value=
                                         """
                                         <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
