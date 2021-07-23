@@ -115,7 +115,7 @@ def download_geoip(geoip_license_key: str, download_path: str, extract_path: str
 
 def download_access_stats_old(file_path: str, release_date: str, username: str, password: str, publisher_name: str,
                               geoip_client: geoip2.database.Reader, bucket_name: str, blob_name: str,
-                              unprocessed_publishers: list = None) -> [int, bool]:
+                              unprocessed_publishers: list = None) -> [int, list]:
     """ Download the oapen irus uk access stats data and replace IP addresses with geographical information.
     Data is downloaded from both BR1b IP and BR1b Country reports, these are COUNTER 4 reports. The results for each
     book from both reports are merged into one result dictionary.

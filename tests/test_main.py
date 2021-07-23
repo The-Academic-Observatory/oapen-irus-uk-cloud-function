@@ -69,8 +69,8 @@ class TestCloudFunction(unittest.TestCase):
         """ Test downloading OAPEN Irus UK access stats """
         # download older version
         mock_upload_blob.return_value = True
-        mock_download_old.return_value = None
-        mock_download_new.return_value = None
+        mock_download_old.return_value = 10, []
+        mock_download_new.return_value = 10
         mock_geoip_reader.return_value = 'geoip_client'
         mock_download_geoip.return_value = None
 
@@ -89,7 +89,7 @@ class TestCloudFunction(unittest.TestCase):
                                                  data['blob_name'])
         mock_download_old.assert_called_once_with('/tmp/oapen_access_stats.jsonl.gz', data['release_date'],
                                                   data['username'], data['password'], data['publisher_name'],
-                                                  'geoip_client')
+                                                  'geoip_client', 'bucket_name', 'blob_name', None)
         mock_download_new.assert_not_called()
         mock_geoip_reader.assert_called_once_with('/tmp/geolite_city.mmdb')
         mock_download_geoip.assert_called_once_with(data['geoip_license_key'], '/tmp/geolite_city.tar.gz',
