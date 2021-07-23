@@ -28,7 +28,6 @@ from typing import List, Tuple, Union
 import geoip2.database
 import jsonlines
 import requests
-from bs4 import BeautifulSoup
 from geoip2.errors import AddressNotFoundError
 from google.cloud import storage
 from requests import Session
@@ -62,9 +61,11 @@ def download(request):
     logging.info(f'Downloading oapen access stats for month: {release_date}, publisher name: {publisher_name}, '
                  f'publisher UUID: {publisher_uuid}')
     if datetime.strptime(release_date, '%Y-%m') >= datetime(2020, 4, 1):
-        download_access_stats_new(file_path, release_date, username, password, publisher_uuid, geoip_client)
+        success = download_access_stats_new(file_path, release_date, username, password, publisher_uuid, geoip_client)
     else:
-        download_access_stats_old(file_path, release_date, username, password, publisher_name, geoip_client)
+        success = download_access_stats_old(file_path, release_date, username, password, publisher_name, geoip_client)
+    if not success:
+        return
 
     # upload oapen access stats to bucket
     success = upload_file_to_storage_bucket(file_path, bucket_name, blob_name)
@@ -103,7 +104,7 @@ def download_geoip(geoip_license_key: str, download_path: str, extract_path: str
 
 
 def download_access_stats_old(file_path: str, release_date: str, username: str, password: str, publisher_name: str,
-                              geoip_client: geoip2.database.Reader):
+                              geoip_client: geoip2.database.Reader) -> bool:
     """ Download the oapen irus uk access stats data and replace IP addresses with geographical information.
     Data is downloaded from both BR1b IP and BR1b Country reports, these are COUNTER 4 reports. The results for each
     book from both reports are merged into one result dictionary.
@@ -114,7 +115,7 @@ def download_access_stats_old(file_path: str, release_date: str, username: str, 
     :param password: OAPEN password
     :param publisher_name: Publisher name
     :param geoip_client: Geoip client
-    :return: None
+    :return: Whether to continue or not
     """
     # get last date of month
     year, month = release_date.split('-')
@@ -142,82 +143,77 @@ def download_access_stats_old(file_path: str, release_date: str, username: str, 
     else:
         raise RuntimeError(f'Login at https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/?action=login unsuccessful')
 
-    # Get list of all publisher names
-    if publisher_name:
-        publishers = [publisher_name]
-    else:
-        publishers = list_all_publishers(ip_url, session)
-
     all_results = []
-    for publisher_name in publishers:
-        ip_url += f'&frmPublisher={publisher_name}'
-        country_url += f'&frmPublisher={publisher_name}'
+    ip_url += f'&frmPublisher={publisher_name}'
+    country_url += f'&frmPublisher={publisher_name}'
 
-        # get tsv files of reports and store results in list of dicts using csv dictreader
-        ip_entries, publisher, begin_date, end_date = download_tsv_file(ip_url, session)
-        if not ip_entries:
-            continue
-        country_entries, _, _, _ = download_tsv_file(country_url, session)
+    # get tsv files of reports and store results in list of dicts using csv dictreader
+    ip_entries, publisher, begin_date, end_date = download_tsv_file(ip_url, session)
+    if not ip_entries:
+        logging.info(f'No access stats entries available for {publisher} in {release_date}')
+        return False
+    country_entries, _, _, _ = download_tsv_file(country_url, session)
 
-        # set values for first book
-        book_title = ip_entries[0]['Title']
-        grant = ip_entries[0]['Grant']
-        grant_number = ip_entries[0]['Grant Number']
-        doi = ip_entries[0]['DOI']
-        isbn = ip_entries[0]['ISBN'].strip('ISBN ')
-        location_info = []
-        total_title_requests = 0
+    # set values for first book
+    book_title = ip_entries[0]['Title']
+    grant = ip_entries[0]['Grant']
+    grant_number = ip_entries[0]['Grant Number']
+    doi = ip_entries[0]['DOI']
+    isbn = ip_entries[0]['ISBN'].strip('ISBN ')
+    location_info = []
+    total_title_requests = 0
 
-        prev_id = None
-        # loop through clients in ip_entries
-        for entry in ip_entries:
-            proprietary_id = entry['Proprietary Identifier']
-            # Write out results of previous title when getting to new title
-            if prev_id and prev_id != proprietary_id:
-                # Get info from all rows of country_entries with the same book id
-                country_info, country_title_requests = get_country_info(prev_id, country_entries)
-                # Check that the total title requests for 1 book from IP and Country reports are the same
-                assert total_title_requests == country_title_requests
-                all_results = add_result(prev_id, None, doi, isbn, book_title, grant, grant_number, publisher, begin_date,
-                                         end_date, total_title_requests, None, None, None, None, country_info,
-                                         location_info, '4', all_results)
+    prev_id = None
+    # loop through clients in ip_entries
+    for entry in ip_entries:
+        proprietary_id = entry['Proprietary Identifier']
+        # Write out results of previous title when getting to new title
+        if prev_id and prev_id != proprietary_id:
+            # Get info from all rows of country_entries with the same book id
+            country_info, country_title_requests = get_country_info(prev_id, country_entries)
+            # Check that the total title requests for 1 book from IP and Country reports are the same
+            assert total_title_requests == country_title_requests
+            all_results = add_result(prev_id, None, doi, isbn, book_title, grant, grant_number, publisher, begin_date,
+                                     end_date, total_title_requests, None, None, None, None, country_info,
+                                     location_info, '4', all_results)
 
-                # Get info for new book title
-                book_title = entry['Title']
-                grant = entry['Grant']
-                grant_number = entry['Grant Number']
-                doi = entry['DOI']
-                isbn = entry['ISBN'].strip('ISBN ')
+            # Get info for new book title
+            book_title = entry['Title']
+            grant = entry['Grant']
+            grant_number = entry['Grant Number']
+            doi = entry['DOI']
+            isbn = entry['ISBN'].strip('ISBN ')
 
-                # Reset location info and total title requests
-                location_info = []
-                total_title_requests = 0
+            # Reset location info and total title requests
+            location_info = []
+            total_title_requests = 0
 
-            # Get location info
-            client_ip = entry['IP Address']
-            title_requests = entry['Reporting Period Total']
-            add_location_info(location_info, client_ip, geoip_client, title_requests=title_requests)
+        # Get location info
+        client_ip = entry['IP Address']
+        title_requests = entry['Reporting Period Total']
+        add_location_info(location_info, client_ip, geoip_client, title_requests=title_requests)
 
-            # Sum the title requests
-            total_title_requests += int(title_requests)
+        # Sum the title requests
+        total_title_requests += int(title_requests)
 
-            # Set the previous id
-            prev_id = proprietary_id
-            continue
+        # Set the previous id
+        prev_id = proprietary_id
+        continue
 
-        # Add result of the last book title
-        country_info, country_title_requests = get_country_info(prev_id, country_entries)
-        assert total_title_requests == country_title_requests
-        all_results = add_result(prev_id, None, doi, isbn, book_title, grant, grant_number, publisher, begin_date,
-                                 end_date, total_title_requests, None, None, None, None, country_info, location_info,
-                                 '4', all_results)
+    # Add result of the last book title
+    country_info, country_title_requests = get_country_info(prev_id, country_entries)
+    assert total_title_requests == country_title_requests
+    all_results = add_result(prev_id, None, doi, isbn, book_title, grant, grant_number, publisher, begin_date,
+                             end_date, total_title_requests, None, None, None, None, country_info, location_info,
+                             '4', all_results)
 
     logging.info(f'Found {len(all_results)} access stats entries')
     list_to_jsonl_gz(file_path, all_results)
+    return True
 
 
 def download_access_stats_new(file_path: str, release_date: str, username: str, password: str, publisher_uuid: str,
-                              geoip_client: geoip2.database.Reader):
+                              geoip_client: geoip2.database.Reader) -> bool:
     """ Download the oapen irus uk access stats data and replace IP addresses with geographical information.
     The API is queried 3 times. Once without any attributes, once with the country attribute and once with the IP
     attribute. The results of these queries are merged into one result dictionary.
@@ -228,7 +224,7 @@ def download_access_stats_new(file_path: str, release_date: str, username: str, 
     :param password: OAPEN API Key
     :param publisher_uuid: UUID of publisher
     :param geoip_client: Geoip client
-    :return: None.
+    :return: Whether to continue or not.
     """
     # Create urls
     requestor_id = username
@@ -329,19 +325,7 @@ def download_access_stats_new(file_path: str, release_date: str, username: str, 
                                  '5', all_results)
     logging.info(f'Found {len(all_results)} access stats entries')
     list_to_jsonl_gz(file_path, all_results)
-
-
-def list_all_publishers(url: str, session: Session) -> List[str]:
-    """
-
-    :param url:
-    :param session:
-    :return:
-    """
-    response = session.get(url)
-    soup = BeautifulSoup(response.text)
-    publishers = [match.text for match in soup.find('select', attrs={'name': 'frmPublisher'}).find_all('option')]
-    return publishers
+    return len(all_results) > 0
 
 
 def download_tsv_file(url: str, session: Session) -> [List[dict], str, str, str]:
