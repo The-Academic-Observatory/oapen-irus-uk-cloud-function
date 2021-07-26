@@ -1,77 +1,59 @@
 {
   "Report_Header": {
-    "Created": "2021-04-14T04:58:51Z",
-    "Created_By": "IRUS for OAPEN DSpace",
-    "Customer_ID": "",
+    "Report_Name": "IRUS Custom Item Master Report for OAPEN DSpace",
     "Report_ID": "OAPEN_IR",
     "Release": "5",
-    "Report_Name": "OAPEN Custom Item Master Report",
-    "Institution_Name": "",
-    "Report_Filters": [
-      {
-        "Name": "Begin_Date",
-        "Value": "2020-04-01"
-      },
-      {
-        "Name": "End_Date",
-        "Value": "2020-04-30"
-      },
-      {
-        "Name": "OAPEN_Publisher_UUID",
-        "Value": "publisher_uuid"
-      }
-    ]
+    "Institution_Name": "OAPEN Foundation",
+    "Institution_ID": "",
+    "Report_Filters": {
+      "Begin_Date": "2020-04-01",
+      "End_Date": "2020-04-30",
+      "Platform": "215 - OAPEN DSpace",
+      "OAPEN_Publisher_UUID": "publisher_uuid"
+    },
+    "Created": "2021-07-26T01:34:06Z",
+    "Created_By": "IRUS on behalf of OAPEN Foundation",
+    "API_Version": "2.1"
   },
   "Report_Items": [
     {
-      "Platform": "OAPEN DSpace",
       "Item": "Health later enjoy.",
       "Publisher": "Publisher Name",
-      "OAPEN_Publisher_UUID": "publisher_uuid",
-      "Contributor": "Thompson, John",
-      "Data_Type": "Book",
+      "Publisher_ID": "publisher_uuid",
+      "Authors": "Thompson, John",
+      "DOI": "67.98437/OAPEN_842332",
+      "ISBN": "9781842397421",
+      "URI": "http://library.oapen.org/handle/15.713.71571/92162",
+      "Item_Type": "Book",
       "YOP": "2017",
-      "Item_ID": {
-        "Proprietary": "irus:8892521",
-        "URI": "http://library.oapen.org/handle/83.192.71036/91737",
-        "ISBN": "9617439216201"
-      },
-      "Performance": [
+      "Platform": "OAPEN DSpace",
+      "IRUS_Item_ID": "8892521",
+      "Performance_Instances": [
         {
-          "Period": {
-            "Begin_Date": "2020-04-01",
-            "End_Date": "2020-04-30"
-          },
-          "Instance": {
-            "Total_Item_Investigations": 3,
-            "Total_Item_Requests": 3,
-            "Unique_Item_Investigations": 2,
-            "Unique_Item_Requests": 2
+          "Event_Month": "2020-04",
+          "Metric_Type_Counts": {
+            "Total_Item_Investigations": 1,
+            "Total_Item_Requests": 1,
+            "Unique_Item_Investigations": 1,
+            "Unique_Item_Requests": 1
           }
         }
       ]
     },
     {
-      "Platform": "OAPEN DSpace",
       "Item": "Everyone discuss letter environment",
       "Publisher": "Publisher Name",
-      "OAPEN_Publisher_UUID": "publisher_uuid",
-      "Contributor": "Hernandez, Steven",
-      "Data_Type": "Book",
+      "Publisher_ID": "publisher_uuid",
+      "Authors": "Hernandez, Steven",
+      "URI": "http://library.oapen.org/handle/15.713.71571/92162",
+      "Item_Type": "Book",
       "YOP": "2017",
-      "Item_ID": {
-        "Proprietary": "irus:7669052",
-        "URI": "http://library.oapen.org/handle/15.713.71571/92162",
-        "DOI": "92.61942/472.1853785113177",
-        "ISBN": "1853785113177"
-      },
-      "Performance": [
+      "Platform": "OAPEN DSpace",
+      "IRUS_Item_ID": "7669052",
+      "Performance_Instances": [
         {
-          "Period": {
-            "Begin_Date": "2020-04-01",
-            "End_Date": "2020-04-30"
-          },
-          "Instance": {
+          "Event_Month": "2020-04",
+          "Metric_Type_Counts": {
             "Total_Item_Investigations": 1,
             "Total_Item_Requests": 1,
             "Unique_Item_Investigations": 1,

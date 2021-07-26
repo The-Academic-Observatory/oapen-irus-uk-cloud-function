@@ -59,7 +59,7 @@ class TestCloudFunction(unittest.TestCase):
         self.download_path_v5_base_error = test_fixtures_path('download_base_error_2020_04.json')
         self.download_path_v5_country = test_fixtures_path('download_country_2020_04.json')
         self.download_path_v5_ip = test_fixtures_path('download_ip_2020_04.json')
-        self.download_hash_v5 = '693f4c5f'
+        self.download_hash_v5 = '739e3aaa'
 
     @patch('main.download_geoip')
     @patch('main.geoip2.database.Reader')
@@ -310,8 +310,8 @@ class TestCloudFunction(unittest.TestCase):
                 release_date = '2020-04'
                 requestor_id = 'requestor_id'
                 api_key = 'api_key'
-                base_url = f'https://irus.jisc.ac.uk/api/oapen/reports/oapen_ir/?requestor_id={requestor_id}' \
-                           f'&begin_date={release_date}&end_date={release_date}&api_key={api_key}'
+                base_url = f'https://irus.jisc.ac.uk/api/oapen/reports/oapen_ir/?platform=215&requestor_id' \
+                           f'={requestor_id}&api_key={api_key}&begin_date={release_date}&end_date={release_date}'
                 if publisher_uuid:
                     base_url += f'&publisher={publisher_uuid}'
 
@@ -344,9 +344,9 @@ class TestCloudFunction(unittest.TestCase):
 
                         # test response without error in header
                         if base_url_path == self.download_path_v5_base:
-                            download_access_stats_new(file_path, release_date, requestor_id, api_key, publisher_uuid,
-                                                      Mock(spec=geoip2.database.Reader))
-
+                            no_entries = download_access_stats_new(file_path, release_date, requestor_id, api_key,
+                                                          publisher_uuid, Mock(spec=geoip2.database.Reader))
+                            self.assertEqual(2, no_entries)
                             actual_hash = gzip_file_crc(file_path)
                             self.assertEqual(self.download_hash_v5, actual_hash)
                         # test response with error in header

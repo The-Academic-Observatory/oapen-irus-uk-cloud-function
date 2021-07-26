@@ -133,12 +133,12 @@ def download_access_stats_old(file_path: str, release_date: str, username: str, 
     :param unprocessed_publishers: List of remaining publishers to be processed (when no publisher name is specified)
     :return: The number of access stats entries and a list of unprocessed publishers
     """
-    # get last date of month
+    # get begin and end date
     year, month = release_date.split('-')
     last_date_month = str(calendar.monthrange(int(year), int(month))[1])
-
     start_date = release_date + "-01"
     end_date = release_date + "-" + last_date_month
+
     ip_base_url = f'https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/br1b/?frmRepository=1%7COAPEN+Library' \
                   f'&frmFrom={start_date}&frmTo={end_date}&frmFormat=TSV&Go=Generate+Report'
     country_base_url = f'https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/br1bCountry/?frmRepository=1%7COAPEN' \
@@ -262,8 +262,8 @@ def download_access_stats_new(file_path: str, release_date: str, username: str, 
     # Create urls
     requestor_id = username
     api_key = password
-    base_url = f'https://irus.jisc.ac.uk/api/oapen/reports/oapen_ir/?requestor_id={requestor_id}' \
-               f'&begin_date={release_date}&end_date={release_date}&api_key={api_key}'
+    base_url = f'https://irus.jisc.ac.uk/api/oapen/reports/oapen_ir/?platform=215&requestor_id={requestor_id}' \
+               f'&api_key={api_key}&begin_date={release_date}&end_date={release_date}'
     if publisher_uuid:
         base_url += f'&publisher={publisher_uuid}'
     url_ip = base_url + '&attributes_to_show=Client_IP'
@@ -293,32 +293,31 @@ def download_access_stats_new(file_path: str, release_date: str, username: str, 
         # Use base item to get general info on book
         book_title = base_item['Item']
         publisher = base_item['Publisher']
-        begin_date = base_item['Performance'][0]['Period']['Begin_Date']
-        end_date = base_item['Performance'][0]['Period']['End_Date']
+        event_month = base_item['Performance_Instances'][0]['Event_Month']
+
+        # Get begin and end date
+        year, month = event_month.split('-')
+        last_date_month = str(calendar.monthrange(int(year), int(month))[1])
+        begin_date = release_date + "-01"
+        end_date = release_date + "-" + last_date_month
 
         # Get item IDs if they are given
-        ids = {'Proprietary': None, 'URI': None, 'DOI': None, 'ISBN': None}
-        for id_name in ids:
-            try:
-                id_value = base_item['Item_ID'][id_name]
-                ids[id_name] = id_value
-            except KeyError:
-                pass
-        proprietary_id = ids['Proprietary']
-        uri = ids['URI']
-        doi = ids['DOI']
-        isbn = ids['ISBN']
+        proprietary_id = base_item.get('IRUS_Item_ID', None)
+        uri = base_item.get('URI', None)
+        doi = base_item.get('DOI', None)
+        isbn = base_item.get('ISBN', None)
 
         # Get location info
         location_info = []
-        for client in ip_item['Performance']:
-            instance = client['Instance']
-            total_item_investigations = instance['Total_Item_Investigations']
-            total_item_requests = instance['Total_Item_Requests']
-            unique_item_investigations = instance['Unique_Item_Investigations']
-            unique_item_requests = instance['Unique_Item_Requests']
+        for client in ip_item['Performance_Instances']:
+            client_ip = client['Client_IP']
 
-            client_ip = client['Instance']['Client_IP']
+            counts = client['Metric_Type_Counts']
+            total_item_investigations = counts['Total_Item_Investigations']
+            total_item_requests = counts['Total_Item_Requests']
+            unique_item_investigations = counts['Unique_Item_Investigations']
+            unique_item_requests = counts['Unique_Item_Requests']
+
             add_location_info(location_info, client_ip, geoip_client,
                               total_item_investigations=total_item_investigations,
                               total_item_requests=total_item_requests,
@@ -327,14 +326,16 @@ def download_access_stats_new(file_path: str, release_date: str, username: str, 
 
         # Get country info
         country_info = []
-        for country in country_item['Performance']:
-            instance = country['Instance']
-            country_name = instance.get('Country', {'Country_Name': ''})['Country_Name']
-            country_code = instance.get('Country', {'Country_Code': ''})['Country_Code']
-            total_item_investigations = instance['Total_Item_Investigations']
-            total_item_requests = instance['Total_Item_Requests']
-            unique_item_investigations = instance['Unique_Item_Investigations']
-            unique_item_requests = instance['Unique_Item_Requests']
+        for country in country_item['Performance_Instances']:
+            country_name = country['Country']['Country']
+            country_code = country['Country']['Country_Code']
+
+            counts = country['Metric_Type_Counts']
+            total_item_investigations = counts['Total_Item_Investigations']
+            total_item_requests = counts['Total_Item_Requests']
+            unique_item_investigations = counts['Unique_Item_Investigations']
+            unique_item_requests = counts['Unique_Item_Requests']
+
             add_country_info(country_info, country_name, country_code,
                              total_item_investigations=total_item_investigations,
                              total_item_requests=total_item_requests,
@@ -345,12 +346,12 @@ def download_access_stats_new(file_path: str, release_date: str, username: str, 
         total_item_requests = 0
         unique_item_investigations = 0
         unique_item_requests = 0
-        for unknown in base_item['Performance']:
-            instance = unknown['Instance']
-            total_item_investigations += instance['Total_Item_Investigations']
-            total_item_requests += instance['Total_Item_Requests']
-            unique_item_investigations += instance['Unique_Item_Investigations']
-            unique_item_requests += instance['Unique_Item_Requests']
+        for unknown in base_item['Performance_Instances']:
+            counts = unknown['Metric_Type_Counts']
+            total_item_investigations += counts['Total_Item_Investigations']
+            total_item_requests += counts['Total_Item_Requests']
+            unique_item_investigations += counts['Unique_Item_Investigations']
+            unique_item_requests += counts['Unique_Item_Requests']
 
         all_results = add_result(proprietary_id, uri, doi, isbn, book_title, None, None, publisher, begin_date,
                                  end_date, None, total_item_investigations, total_item_requests,
