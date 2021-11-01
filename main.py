@@ -26,7 +26,7 @@ import shutil
 import subprocess
 import time
 from datetime import datetime
-from typing import List, Tuple, Union
+from typing import List, Tuple, Union, Optional
 
 import geoip2.database
 import jsonlines
@@ -64,8 +64,8 @@ def download(request):
     # download oapen access stats and replace ip addresses
     file_path = "/tmp/oapen_access_stats.jsonl.gz"
     logging.info(
-        f"Downloading oapen access stats for month: {release_date}, publisher name: {publisher_name}, "
-        f"publisher UUID: {publisher_uuid}"
+        f"Downloading oapen access stats for month: {release_date}, publisher name(s): {publisher_name}, "
+        f"publisher UUID(s): {publisher_uuid}"
     )
     if datetime.strptime(release_date, "%Y-%m") >= datetime(2020, 4, 1):
         entries = download_access_stats_new(file_path, release_date, username, password, publisher_uuid, geoip_client)
@@ -130,7 +130,7 @@ def download_access_stats_old(
     release_date: str,
     username: str,
     password: str,
-    publisher_name: str,
+    publisher_name: Optional[str],
     geoip_client: geoip2.database.Reader,
     bucket_name: str,
     blob_name: str,
@@ -148,7 +148,7 @@ def download_access_stats_old(
     :param release_date: Release date ('YYYY-MM')
     :param username: OAPEN username/email
     :param password: OAPEN password
-    :param publisher_name: Publisher name
+    :param publisher_name: String of publisher names, separated by "|"
     :param geoip_client: Geoip client
     :param bucket_name: The Google Cloud storage bucket name
     :param blob_name: The Google Cloud storage blob name
@@ -186,7 +186,7 @@ def download_access_stats_old(
     all_results = []
     # Get list of all publisher names
     if publisher_name:
-        publishers = [publisher_name]
+        publishers = publisher_name.split("|")
     else:
         if unprocessed_publishers:
             publishers = unprocessed_publishers
@@ -322,7 +322,7 @@ def download_access_stats_new(
     :param release_date: Release date ('YYYY-MM')
     :param username: OAPEN requestor ID
     :param password: OAPEN API Key
-    :param publisher_uuid: UUID of publisher
+    :param publisher_uuid: UUIDs of publisher(s)
     :param geoip_client: Geoip client
     :return: The number of access stats entries
     """
