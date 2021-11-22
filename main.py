@@ -49,8 +49,8 @@ def download(request):
     username = request_json.get("username")
     password = request_json.get("password")
     geoip_license_key = request_json.get("geoip_license_key")
-    publisher_name = request_json.get("publisher_name")  # e.g. 'UCL+Press'
-    publisher_uuid = request_json.get("publisher_uuid")  # e.g. 'df73bf94-b818-494c-a8dd-6775b0573bc2'
+    publisher_name_v4 = request_json.get("publisher_name_v4")  # e.g. 'UCL+Press'
+    publisher_uuid_v5 = request_json.get("publisher_uuid_v5")  # e.g. 'df73bf94-b818-494c-a8dd-6775b0573bc2'
     unprocessed_publishers = request_json.get("unprocessed_publishers")
     bucket_name = request_json.get("bucket_name")
     blob_name = request_json.get("blob_name")
@@ -64,18 +64,20 @@ def download(request):
     # download oapen access stats and replace ip addresses
     file_path = "/tmp/oapen_access_stats.jsonl.gz"
     logging.info(
-        f"Downloading oapen access stats for month: {release_date}, publisher name(s): {publisher_name}, "
-        f"publisher UUID(s): {publisher_uuid}"
+        f"Downloading oapen access stats for month: {release_date}"
     )
     if datetime.strptime(release_date, "%Y-%m") >= datetime(2020, 4, 1):
-        entries = download_access_stats_new(file_path, release_date, username, password, publisher_uuid, geoip_client)
+        logging.info(f"publisher UUID(s): {publisher_uuid_v5}")
+        entries = download_access_stats_new(file_path, release_date, username, password, publisher_uuid_v5,
+                                            geoip_client)
     else:
+        logging.info(f"Publisher name(s): {publisher_name_v4}")
         entries, unprocessed_publishers = download_access_stats_old(
             file_path,
             release_date,
             username,
             password,
-            publisher_name,
+            publisher_name_v4,
             geoip_client,
             bucket_name,
             blob_name,
@@ -311,7 +313,7 @@ def download_access_stats_new(
     release_date: str,
     username: str,
     password: str,
-    publisher_uuid: str,
+    publisher_uuid: Optional[str],
     geoip_client: geoip2.database.Reader,
 ) -> int:
     """Download the oapen irus uk access stats data and replace IP addresses with geographical information.
