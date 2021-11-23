@@ -59,6 +59,8 @@ class TestCloudFunction(unittest.TestCase):
         self.download_path_v4_empty_publisher = test_fixtures_path("download_empty_publisher_2020_03.tsv")
         self.download_path_v4_publisher = test_fixtures_path("download_publisher_2020_03.tsv")
         self.download_hash_v4_publisher = "04fe8f3f"
+        self.download_path_v4_publishers = test_fixtures_path("download_publishers_2020_03.tsv")
+        self.download_hash_v4_publishers = "3a2dd8f5"
         self.download_path_v4_all_publishers = test_fixtures_path("download_all_publishers_2020_03.tsv")
         self.download_hash_v4_all_publishers = "d78c7192"
         self.download_hash_v4_unprocessed_publishers = "c6953306"
@@ -90,8 +92,8 @@ class TestCloudFunction(unittest.TestCase):
             "username": "username",
             "password": "password",
             "geoip_license_key": "geoip_license_key",
-            "publisher_name": "publisher_name",
-            "publisher_uuid": "publisher_uuid",
+            "publisher_name_v4": "publisher_name1|publisher_name2",
+            "publisher_uuid_v5": "publisher_uuid1|publisher_uuid2",
             "bucket_name": "bucket_name",
             "blob_name": "blob_name",
         }
@@ -106,7 +108,7 @@ class TestCloudFunction(unittest.TestCase):
             data["release_date"],
             data["username"],
             data["password"],
-            data["publisher_name"],
+            data["publisher_name_v4"],
             "geoip_client",
             "bucket_name",
             "blob_name",
@@ -137,7 +139,7 @@ class TestCloudFunction(unittest.TestCase):
             data["release_date"],
             data["username"],
             data["password"],
-            data["publisher_uuid"],
+            data["publisher_uuid_v5"],
             "geoip_client",
         )
         mock_geoip_reader.assert_called_once_with("/tmp/geolite_city.mmdb")
@@ -349,6 +351,23 @@ class TestCloudFunction(unittest.TestCase):
                 self.assertEqual([], publishers)
                 actual_hash = gzip_file_crc(file_path)
                 self.assertEqual(self.download_hash_v4_publisher, actual_hash)
+
+            # Test with multiple given publisher names, delimited by "|"
+            with vcr.use_cassette(self.download_path_v4_publishers):
+                entries, publishers = download_access_stats_old(
+                    file_path,
+                    release_date,
+                    "username",
+                    "password",
+                    "Publisher1|Publisher2",
+                    Mock(spec=geoip2.database.Reader),
+                    "bucket",
+                    "blob",
+                )
+                self.assertEqual(4, entries)
+                self.assertEqual([], publishers)
+                actual_hash = gzip_file_crc(file_path)
+                self.assertEqual(self.download_hash_v4_publishers, actual_hash)
 
             # Test with a given publisher name, but no entries for that publisher
             with vcr.use_cassette(self.download_path_v4_empty_publisher):
