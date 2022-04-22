@@ -19,7 +19,6 @@ import csv
 import gzip
 import io
 import json
-import logging
 import os
 import re
 import shutil
@@ -63,15 +62,15 @@ def download(request):
 
     # download oapen access stats and replace ip addresses
     file_path = "/tmp/oapen_access_stats.jsonl.gz"
-    logging.info(
+    print(
         f"Downloading oapen access stats for month: {release_date}"
     )
     if datetime.strptime(release_date, "%Y-%m") >= datetime(2020, 4, 1):
-        logging.info(f"publisher UUID(s): {publisher_uuid_v5}")
+        print(f"publisher UUID(s): {publisher_uuid_v5}")
         entries = download_access_stats_new(file_path, release_date, username, password, publisher_uuid_v5,
                                             geoip_client)
     else:
-        logging.info(f"Publisher name(s): {publisher_name_v4}")
+        print(f"Publisher name(s): {publisher_name_v4}")
         entries, unprocessed_publishers = download_access_stats_old(
             file_path,
             release_date,
@@ -107,22 +106,22 @@ def download_geoip(geoip_license_key: str, download_path: str, extract_path: str
     )
 
     # Download release in tar.gz format
-    logging.info(f"Downloading geolite database file to: {download_path}")
+    print(f"Downloading geolite database file to: {download_path}")
     with requests.get(geolite_url, stream=True) as response:
         with open(download_path, "wb") as file:
             shutil.copyfileobj(response.raw, file)
 
     # Tar file contains multiple files, use tar -ztf to get path of 'GeoLite2-City.mmdb'
     # Use this path to extract only GeoLite2-City.mmdb to a new file.
-    logging.info(f"Extracting geolite database file to: {extract_path}")
+    print(f"Extracting geolite database file to: {extract_path}")
     cmd = (
         f"registry_path=$(tar -ztf {download_path} | grep -m1 '/GeoLite2-City.mmdb'); "
         f"tar -xOzf {download_path} $registry_path > {extract_path}"
     )
     proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, executable="/bin/bash")
     output, error = proc.communicate()
-    logging.info(f"stdout: {output}")
-    logging.info(f"stderr: {error}")
+    print(f"stdout: {output}")
+    print(f"stderr: {error}")
     if proc.returncode != 0:
         raise RuntimeError("Extracting geolite database unsuccessful")
 
@@ -181,7 +180,7 @@ def download_access_stats_old(
         data={"email": username, "password": password, "action": "login"},
     )
     if "After you have finished your session please remember to" in login_response.text:
-        logging.info("Successfully logged in at https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/?action=login")
+        print("Successfully logged in at https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/?action=login")
     else:
         raise RuntimeError(f"Login at https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/?action=login unsuccessful")
 
@@ -210,7 +209,7 @@ def download_access_stats_old(
         # get tsv files of reports and store results in list of dicts using csv dictreader
         ip_entries, publisher, begin_date, end_date = download_tsv_file(ip_url, session)
         if not ip_entries:
-            logging.info(f"No access stats entries available for {publisher} in {release_date}")
+            print(f"No access stats entries available for {publisher} in {release_date}")
             continue
         country_entries, _, _, _ = download_tsv_file(country_url, session)
 
@@ -303,7 +302,7 @@ def download_access_stats_old(
             all_results,
         )
 
-    logging.info(f"Total {len(all_results)} access stats entries, {len(publishers)} publishers remaining")
+    print(f"Total {len(all_results)} access stats entries, {len(publishers)} publishers remaining")
     list_to_jsonl_gz(file_path, all_results)
     return len(all_results), publishers
 
@@ -454,7 +453,7 @@ def download_access_stats_new(
             "5",
             all_results,
         )
-    logging.info(f"Found {len(all_results)} access stats entries")
+    print(f"Found {len(all_results)} access stats entries")
     list_to_jsonl_gz(file_path, all_results)
     return len(all_results)
 
@@ -468,7 +467,7 @@ def get_existing_results(results_path: str, bucket_name: str, blob_name: str) ->
     :param blob_name: The Google Cloud storage blob name
     :return: A list with dictionaries of results
     """
-    logging.info("Getting results data downloaded for publishers so far")
+    print("Getting results data downloaded for publishers so far")
     download_file_from_storage_bucket(results_path, bucket_name, blob_name)
     with gzip.open(results_path, "r") as f:
         all_results = [json.loads(line) for line in f]
@@ -482,7 +481,7 @@ def get_all_publishers(url: str, session: Session) -> List[str]:
     :param session: The requests session.
     :return: A list with all available publisher names
     """
-    logging.info("Getting list of all available publishers")
+    print("Getting list of all available publishers")
     # Get all available publishers from portal
     response = session.get(url)
     soup = BeautifulSoup(response.text, features="html.parser")
@@ -500,7 +499,7 @@ def download_tsv_file(url: str, session: Session) -> [List[dict], str, str, str]
     """
     response = session.get(url)
     if response.status_code == 200 and response.text.startswith('"Book Report 1b (BR1b)"'):
-        logging.info(f"Successfully downloaded tsv file from URL: {url}")
+        print(f"Successfully downloaded tsv file from URL: {url}")
     else:
         raise RuntimeError(f"Downloading tsv file unsuccessful from URL: {url}")
     content = response.content.decode("utf-8").splitlines()
@@ -531,7 +530,7 @@ def get_response(url: str) -> dict:
             f"Request unsuccessful, url: {masked_url}, status code: {response.status_code}, "
             f"response: {response.text}, reason: {response.reason}"
         )
-    logging.info(f"Successfully got response from URL: {masked_url}")
+    print(f"Successfully got response from URL: {masked_url}")
     response_json = response.json()
     return response_json
 
@@ -746,7 +745,7 @@ def list_to_jsonl_gz(file_path: str, list_of_dicts: List[dict]):
     :param list_of_dicts: A list containing dictionaries that can be written out with jsonlines
     :return: None.
     """
-    logging.info(f"Writing results to file: {file_path}")
+    print(f"Writing results to file: {file_path}")
     with io.BytesIO() as bytes_io:
         with gzip.GzipFile(fileobj=bytes_io, mode="w") as gzip_file:
             with jsonlines.Writer(gzip_file) as writer:
@@ -768,7 +767,7 @@ def upload_file_to_storage_bucket(file_path: str, bucket_name: str, blob_name: s
     bucket = storage_client.bucket(bucket_name)
     blob = bucket.blob(blob_name)
 
-    logging.info(f'Uploading file "{file_path}". Blob: {blob_name}, bucket: {bucket_name}')
+    print(f'Uploading file "{file_path}". Blob: {blob_name}, bucket: {bucket_name}')
     blob.upload_from_filename(file_path)
 
     return True if blob.exists() else False
@@ -786,7 +785,7 @@ def download_file_from_storage_bucket(file_path: str, bucket_name: str, blob_nam
     bucket = storage_client.bucket(bucket_name)
     blob = bucket.blob(blob_name)
 
-    logging.info(f'Downloading file to "{file_path}". From blob: {blob_name}, bucket: {bucket_name}')
+    print(f'Downloading file to "{file_path}". From blob: {blob_name}, bucket: {bucket_name}')
     blob.download_to_filename(file_path)
 
     return True if os.path.exists(file_path) else False
