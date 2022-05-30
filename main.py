@@ -331,7 +331,7 @@ def download_access_stats_new(
     requestor_id = username
     api_key = password
     base_url = (
-        f"https://irus.jisc.ac.uk/api/oapen/reports/oapen_ir/?platform=215&requestor_id={requestor_id}"
+        f"https://irus.jisc.ac.uk/api/v3/oapen/reports/oapen_ir/?platform=215&requestor_id={requestor_id}"
         f"&api_key={api_key}&begin_date={release_date}&end_date={release_date}"
     )
     if publisher_uuid:
