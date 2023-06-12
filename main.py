@@ -91,7 +91,7 @@ def download(request) -> None:
     else:
         print(f"Successfully uploaded file '{file_path}' to bucket '{bucket_name}'")
 
-    data = {"bucket_name": bucket_name, "blob_name": entries, "unprocessed_publishers": unprocessed_publishers}
+    data = {"bucket_name": bucket_name, "blob_name": blob_name, "unprocessed_publishers": unprocessed_publishers}
     response = flask.Response(response=json.dumps(data), status=200, content_type="application/json")
     return response
 
