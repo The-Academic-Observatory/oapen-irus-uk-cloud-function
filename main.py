@@ -62,7 +62,12 @@ def download(request) -> None:
     if datetime.strptime(release_date, "%Y-%m") >= datetime(2020, 4, 1):
         print(f"publisher UUID(s): {publisher_uuid_v5}")
         entries = download_access_stats_new(
-            file_path, release_date, username, password, publisher_uuid_v5, geoip_client
+            file_path=file_path,
+            release_date=release_date,
+            username=username,
+            password=password,
+            publisher_uuid=publisher_uuid_v5,
+            geoip_client=geoip_client,
         )
     else:
         print(f"Publisher name(s): {publisher_name_v4}")
@@ -82,6 +87,8 @@ def download(request) -> None:
     success = upload_file_to_storage_bucket(file_path, bucket_name, blob_name)
     if not success:
         raise RuntimeError("Uploading file to storage bucket unsuccessful")
+    else:
+        print(f"Successfully uploaded file '{file_path}' to bucket '{bucket_name}'")
 
     data = {"entries": entries, "unprocessed_publishers": unprocessed_publishers}
     return json.dumps(data), 200, {"Content-Type": "application/json"}
