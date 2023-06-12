@@ -23,6 +23,7 @@ import os
 import re
 import shutil
 import subprocess
+import flask
 from datetime import datetime
 from typing import List, Tuple, Union, Optional
 
@@ -91,7 +92,8 @@ def download(request) -> None:
         print(f"Successfully uploaded file '{file_path}' to bucket '{bucket_name}'")
 
     data = {"entries": entries, "unprocessed_publishers": unprocessed_publishers}
-    return json.dumps(data), 200, {"Content-Type": "application/json"}
+    response = flask.Response(response=json.dumps(data), status=200, content_type="application/json")
+    return response
 
 
 def download_geoip(geoip_license_key: str, download_path: str, extract_path: str) -> None:
