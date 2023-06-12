@@ -23,7 +23,6 @@ import os
 import re
 import shutil
 import subprocess
-import time
 from datetime import datetime
 from typing import List, Tuple, Union, Optional
 
@@ -37,11 +36,10 @@ from requests import Session
 from urllib.parse import quote
 
 
-def download(request):
+def download(request) -> None:
     """Download oapen irus uk access stats data, replace IP addresses and upload data to storage bucket.
 
     :param request: (flask.Request): HTTP request object.
-    :return: None.
     """
     request_json = request.get_json()
     release_date = request_json.get("release_date")  # 'YYYY-MM'
@@ -54,33 +52,30 @@ def download(request):
     bucket_name = request_json.get("bucket_name")
     blob_name = request_json.get("blob_name")
 
-    # download geoip database
+    # download geoip database and initialise client
     download_geoip(geoip_license_key, "/tmp/geolite_city.tar.gz", "/tmp/geolite_city.mmdb")
-
-    # initialise geoip client
     geoip_client = geoip2.database.Reader("/tmp/geolite_city.mmdb")
 
     # download oapen access stats and replace ip addresses
     file_path = "/tmp/oapen_access_stats.jsonl.gz"
-    print(
-        f"Downloading oapen access stats for month: {release_date}"
-    )
+    print(f"Downloading oapen access stats for month: {release_date}")
     if datetime.strptime(release_date, "%Y-%m") >= datetime(2020, 4, 1):
         print(f"publisher UUID(s): {publisher_uuid_v5}")
-        entries = download_access_stats_new(file_path, release_date, username, password, publisher_uuid_v5,
-                                            geoip_client)
+        entries = download_access_stats_new(
+            file_path, release_date, username, password, publisher_uuid_v5, geoip_client
+        )
     else:
         print(f"Publisher name(s): {publisher_name_v4}")
         entries, unprocessed_publishers = download_access_stats_old(
-            file_path,
-            release_date,
-            username,
-            password,
-            publisher_name_v4,
-            geoip_client,
-            bucket_name,
-            blob_name,
-            unprocessed_publishers,
+            file_path=file_path,
+            release_date=release_date,
+            username=username,
+            password=password,
+            publisher_name=publisher_name_v4,
+            geoip_client=geoip_client,
+            bucket_name=bucket_name,
+            blob_name=blob_name,
+            unprocessed_publishers=unprocessed_publishers,
         )
 
     # upload oapen access stats to bucket
@@ -92,13 +87,12 @@ def download(request):
     return json.dumps(data), 200, {"Content-Type": "application/json"}
 
 
-def download_geoip(geoip_license_key: str, download_path: str, extract_path: str):
+def download_geoip(geoip_license_key: str, download_path: str, extract_path: str) -> None:
     """Download geoip database. The database is downloaded as a .tar.gz file and extracted to a '.mmdb' file.
 
     :param geoip_license_key: The geoip license key
     :param download_path: The download path of .tar.gz file
     :param extract_path: The extract path of .mmdb file
-    :return: None.
     """
     geolite_url = (
         "https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-City&license_key="
@@ -136,7 +130,7 @@ def download_access_stats_old(
     bucket_name: str,
     blob_name: str,
     unprocessed_publishers: list = None,
-) -> [int, list]:
+) -> Tuple[int, list]:
     """Download the oapen irus uk access stats data and replace IP addresses with geographical information.
     Data is downloaded from both BR1b IP and BR1b Country reports, these are COUNTER 4 reports. The results for each
     book from both reports are merged into one result dictionary.
@@ -171,10 +165,8 @@ def download_access_stats_old(
         f"+Library&frmoapenid=&frmFrom={start_date}&frmTo={end_date}&frmFormat=TSV&Go=Generate+Report"
     )
 
-    # start a requests session
+    # start a requests session and login
     session = requests.Session()
-
-    # login
     login_response = session.post(
         "https://irus.jisc.ac.uk/IRUSConsult/irus-oapen/v2/?action=login",
         data={"email": username, "password": password, "action": "login"},
@@ -196,12 +188,7 @@ def download_access_stats_old(
             publishers = get_all_publishers(ip_base_url, session)
 
     # loop through publishers
-    start_time = time.time()
     for publisher_name in publishers[:]:
-        # when at least 1 publisher has been processed, break after 400s to keep enough time left to upload data to
-        # bucket (timeout = 540s)
-        if time.time() - start_time > 400 and all_results:
-            break
         publishers.remove(publisher_name)
         ip_url = ip_base_url + f"&frmPublisher={publisher_name}"
         country_url = country_base_url + f"&frmPublisher={publisher_name}"
@@ -222,48 +209,45 @@ def download_access_stats_old(
         location_info = []
         total_title_requests = 0
 
-        prev_id = None
         # loop through clients in ip_entries
         for entry in ip_entries:
             proprietary_id = entry["Proprietary Identifier"]
-            # Write out results of previous title when getting to new title
-            if prev_id and prev_id != proprietary_id:
-                # Get info from all rows of country_entries with the same book id
-                country_info, country_title_requests = get_country_info(prev_id, country_entries)
-                # Check that the total title requests for 1 book from IP and Country reports are the same
-                assert total_title_requests == country_title_requests
-                all_results = add_result(
-                    prev_id,
-                    None,
-                    doi,
-                    isbn,
-                    book_title,
-                    grant,
-                    grant_number,
-                    publisher,
-                    begin_date,
-                    end_date,
-                    total_title_requests,
-                    None,
-                    None,
-                    None,
-                    None,
-                    country_info,
-                    location_info,
-                    "4",
-                    all_results,
-                )
+            # Get info from all rows of country_entries with the same book id
+            country_info, country_title_requests = get_country_info(proprietary_id, country_entries)
+            # Check that the total title requests for 1 book from IP and Country reports are the same
+            assert total_title_requests == country_title_requests
+            all_results = add_result(
+                proprietary_id=proprietary_id,
+                uri=None,
+                doi=doi,
+                isbn=isbn,
+                book_title=book_title,
+                grant=grant,
+                grant_number=grant_number,
+                publisher=publisher,
+                begin_date=begin_date,
+                end_date=end_date,
+                total_title_requests=total_title_requests,
+                total_item_investigations=None,
+                total_item_requests=None,
+                unique_item_investigations=None,
+                unique_item_requests=None,
+                country_info=country_info,
+                location_info=location_info,
+                version_info="4",
+                all_results=all_results,
+            )
 
-                # Get info for new book title
-                book_title = entry["Title"]
-                grant = entry["Grant"]
-                grant_number = entry["Grant Number"]
-                doi = entry["DOI"]
-                isbn = entry["ISBN"].strip("ISBN ")
+            # Get info for new book title
+            book_title = entry["Title"]
+            grant = entry["Grant"]
+            grant_number = entry["Grant Number"]
+            doi = entry["DOI"]
+            isbn = entry["ISBN"].strip("ISBN ")
 
-                # Reset location info and total title requests
-                location_info = []
-                total_title_requests = 0
+            # Reset location info and total title requests
+            location_info = []
+            total_title_requests = 0
 
             # Get location info
             client_ip = entry["IP Address"]
@@ -272,35 +256,6 @@ def download_access_stats_old(
 
             # Sum the title requests
             total_title_requests += int(title_requests)
-
-            # Set the previous id
-            prev_id = proprietary_id
-            continue
-
-        # Add result of the last book title
-        country_info, country_title_requests = get_country_info(prev_id, country_entries)
-        assert total_title_requests == country_title_requests
-        all_results = add_result(
-            prev_id,
-            None,
-            doi,
-            isbn,
-            book_title,
-            grant,
-            grant_number,
-            publisher,
-            begin_date,
-            end_date,
-            total_title_requests,
-            None,
-            None,
-            None,
-            None,
-            country_info,
-            location_info,
-            "4",
-            all_results,
-        )
 
     print(f"Total {len(all_results)} access stats entries, {len(publishers)} publishers remaining")
     list_to_jsonl_gz(file_path, all_results)
@@ -362,7 +317,7 @@ def download_access_stats_new(
         base_json["Report_Items"], ip_json["Report_Items"], country_json["Report_Items"]
     ):
         # Use base item to get general info on book
-        book_title = base_item["Item"]
+        book_title = base_item.get("Item")
         publisher = base_item.get("Publisher", "")
         event_month = base_item["Performance_Instances"][0]["Event_Month"]
 
@@ -433,25 +388,25 @@ def download_access_stats_new(
             unique_item_requests += counts["Unique_Item_Requests"]
 
         all_results = add_result(
-            proprietary_id,
-            uri,
-            doi,
-            isbn,
-            book_title,
-            None,
-            None,
-            publisher,
-            begin_date,
-            end_date,
-            None,
-            total_item_investigations,
-            total_item_requests,
-            unique_item_investigations,
-            unique_item_requests,
-            country_info,
-            location_info,
-            "5",
-            all_results,
+            proprietary_id=proprietary_id,
+            uri=uri,
+            doi=doi,
+            isbn=isbn,
+            book_title=book_title,
+            grant=None,
+            grant_number=None,
+            publisher=publisher,
+            begin_date=begin_date,
+            end_date=end_date,
+            total_title_requests=None,
+            total_item_investigations=total_item_investigations,
+            total_item_requests=total_item_requests,
+            unique_item_investigations=unique_item_investigations,
+            unique_item_requests=unique_item_requests,
+            country_info=country_info,
+            location_info=location_info,
+            version_info="5",
+            all_results=all_results,
         )
     print(f"Found {len(all_results)} access stats entries")
     list_to_jsonl_gz(file_path, all_results)
@@ -609,10 +564,10 @@ def add_location_info(
     total_item_requests: int = None,
     unique_item_investigations: int = None,
     unique_item_requests: int = None,
-):
+) -> None:
     """Add items to the location_info list. The location_info list contains dictionaries with location info for 1
     book, obtained from the IP address. Each dict is a client with unique location info and the metrics associated
-    with that client.
+    with that client. The input list is updated in-place
 
     :param location_info: The location info list to which the location info of a client will be added.
     :param client_ip: The IP address of the client.
@@ -622,8 +577,6 @@ def add_location_info(
     :param total_item_requests: The number of total item requests for that location.
     :param unique_item_investigations: The number of unique item investigations for that location.
     :param unique_item_requests: The number of unique item requests for that location.
-    :return: Nothing. The list is updated in-place.
-    :return:
     """
     client_lat, client_lon, client_city, client_country, client_country_code = replace_ip_address(
         client_ip, geoip_client
@@ -645,21 +598,22 @@ def add_location_info(
 
 
 def add_result(
+    *,
     proprietary_id: str,
-    uri: [str, None],
+    uri: Optional[str],
     doi: str,
     isbn: str,
     book_title: str,
-    grant: [str, None],
-    grant_number: [str, None],
+    grant: Optional[str],
+    grant_number: Optional[str],
     publisher: str,
     begin_date: str,
     end_date: str,
-    total_title_requests: [int, None],
-    total_item_investigations: [int, None],
-    total_item_requests: [int, None],
-    unique_item_investigations: [int, None],
-    unique_item_requests: [int, None],
+    total_title_requests: Optional[int],
+    total_item_investigations: Optional[int],
+    total_item_requests: Optional[int],
+    unique_item_investigations: Optional[int],
+    unique_item_requests: Optional[int],
     country_info: List[dict],
     location_info: List[dict],
     version_info: str,
@@ -738,12 +692,11 @@ def replace_ip_address(
     return client_lat, client_lon, client_city, client_country, client_country_code
 
 
-def list_to_jsonl_gz(file_path: str, list_of_dicts: List[dict]):
+def list_to_jsonl_gz(file_path: str, list_of_dicts: List[dict]) -> None:
     """Takes a list of dictionaries and writes this to a gzipped jsonl file.
 
     :param file_path: Path to the .jsonl.gz file
     :param list_of_dicts: A list containing dictionaries that can be written out with jsonlines
-    :return: None.
     """
     print(f"Writing results to file: {file_path}")
     with io.BytesIO() as bytes_io:
