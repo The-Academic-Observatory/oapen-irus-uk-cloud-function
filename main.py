@@ -87,8 +87,7 @@ def download(request):
     if not success:
         raise RuntimeError("Uploading file to storage bucket unsuccessful")
 
-    data = {"entries": entries, "unprocessed_publishers": unprocessed_publishers}
-    return json.dumps(data), 200, {"Content-Type": "application/json"}
+    return 200, {"Content-Type": "application/json"}
 
 
 def download_geoip(geoip_license_key: str, download_path: str, extract_path: str):
