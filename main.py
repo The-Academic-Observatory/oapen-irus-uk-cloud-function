@@ -362,7 +362,10 @@ def download_access_stats_new(
         base_json["Report_Items"], ip_json["Report_Items"], country_json["Report_Items"]
     ):
         # Use base item to get general info on book
-        book_title = base_item["Item"]
+        book_title = base_item.get("Item")
+        if not book_title:
+            print(f"Item without title skipped: {base_item}")
+            continue
         publisher = base_item.get("Publisher", "")
         event_month = base_item["Performance_Instances"][0]["Event_Month"]
 
