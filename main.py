@@ -62,13 +62,12 @@ def download(request):
 
     # download oapen access stats and replace ip addresses
     file_path = "/tmp/oapen_access_stats.jsonl.gz"
-    print(
-        f"Downloading oapen access stats for month: {release_date}"
-    )
+    print(f"Downloading oapen access stats for month: {release_date}")
     if datetime.strptime(release_date, "%Y-%m") >= datetime(2020, 4, 1):
         print(f"publisher UUID(s): {publisher_uuid_v5}")
-        entries = download_access_stats_new(file_path, release_date, username, password, publisher_uuid_v5,
-                                            geoip_client)
+        entries = download_access_stats_new(
+            file_path, release_date, username, password, publisher_uuid_v5, geoip_client
+        )
     else:
         print(f"Publisher name(s): {publisher_name_v4}")
         entries, unprocessed_publishers = download_access_stats_old(
@@ -88,8 +87,7 @@ def download(request):
     if not success:
         raise RuntimeError("Uploading file to storage bucket unsuccessful")
 
-    data = {"entries": entries, "unprocessed_publishers": unprocessed_publishers}
-    return json.dumps(data), 200, {"Content-Type": "application/json"}
+    return 200, {"Content-Type": "application/json"}
 
 
 def download_geoip(geoip_license_key: str, download_path: str, extract_path: str):
@@ -196,12 +194,9 @@ def download_access_stats_old(
             publishers = get_all_publishers(ip_base_url, session)
 
     # loop through publishers
-    start_time = time.time()
     for publisher_name in publishers[:]:
         # when at least 1 publisher has been processed, break after 400s to keep enough time left to upload data to
         # bucket (timeout = 540s)
-        if time.time() - start_time > 400 and all_results:
-            break
         publishers.remove(publisher_name)
         ip_url = ip_base_url + f"&frmPublisher={publisher_name}"
         country_url = country_base_url + f"&frmPublisher={publisher_name}"
