@@ -62,13 +62,12 @@ def download(request):
 
     # download oapen access stats and replace ip addresses
     file_path = "/tmp/oapen_access_stats.jsonl.gz"
-    print(
-        f"Downloading oapen access stats for month: {release_date}"
-    )
+    print(f"Downloading oapen access stats for month: {release_date}")
     if datetime.strptime(release_date, "%Y-%m") >= datetime(2020, 4, 1):
         print(f"publisher UUID(s): {publisher_uuid_v5}")
-        entries = download_access_stats_new(file_path, release_date, username, password, publisher_uuid_v5,
-                                            geoip_client)
+        entries = download_access_stats_new(
+            file_path, release_date, username, password, publisher_uuid_v5, geoip_client
+        )
     else:
         print(f"Publisher name(s): {publisher_name_v4}")
         entries, unprocessed_publishers = download_access_stats_old(
@@ -85,10 +84,13 @@ def download(request):
 
     # upload oapen access stats to bucket
     success = upload_file_to_storage_bucket(file_path, bucket_name, blob_name)
-    if not success:
+    if success:
+        print(f"Uploaded blob: {blob_name}")
+    else:
         raise RuntimeError("Uploading file to storage bucket unsuccessful")
 
     data = {"entries": entries, "unprocessed_publishers": unprocessed_publishers}
+    print(f"Returning data: {data}")
     return json.dumps(data), 200, {"Content-Type": "application/json"}
 
 
