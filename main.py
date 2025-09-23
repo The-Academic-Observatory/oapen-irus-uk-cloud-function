@@ -31,7 +31,6 @@ import geoip2.database
 import jsonlines
 import requests
 from bs4 import BeautifulSoup
-from geoip2.errors import AddressNotFoundError
 from google.cloud import storage
 from requests import Session
 from urllib.parse import quote
@@ -532,11 +531,19 @@ def get_response(url: str) -> dict:
     )
     if response.status_code != 200:
         raise RuntimeError(
-            f"Request unsuccessful, url: {masked_url}, status code: {response.status_code}, "
+            f"Request unsuccessful, url: {url}, status code: {response.status_code}, "
             f"response: {response.text}, reason: {response.reason}"
+            f"Everything: {response}"
         )
     print(f"Successfully got response from URL: {masked_url}")
-    response_json = response.json()
+    try:
+        response_json = response.json()
+    except ValueError as e:
+        print("Error parsing response as json")
+        print("Status:", response.status_code)
+        print("Headers:", response.headers)
+        print("Content-Snippet:", response.text[:500])
+        raise RuntimeError("Invalid JSON. See logs.")
     return response_json
 
 
@@ -729,10 +736,7 @@ def replace_ip_address(
     :param geoip_client: The geoip client
     :return: latitude, longitude, city, country and country_code of the client.
     """
-    try:
-        geoip_response = geoip_client.city(client_ip)
-    except AddressNotFoundError:
-        return "", "", "", "", ""
+    geoip_response = geoip_client.city(client_ip)
 
     client_lat = geoip_response.location.latitude
     client_lon = geoip_response.location.longitude

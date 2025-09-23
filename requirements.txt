@@ -1,5 +1,6 @@
-requests==2.24.*
-geoip2==4.1.*
-jsonlines==1.2.*
-google-cloud-storage==1.35.*
-beautifulsoup4==4.9.*
+requests==2.32.3              
+requests-oauthlib==2.0.0      
+geoip2==5.1.0                 
+jsonlines==4.0.0              
+google-cloud-storage==2.18.2  
+beautifulsoup4==4.12.3        
