@@ -28,6 +28,7 @@ from datetime import datetime
 from typing import List, Tuple, Union, Optional
 
 import geoip2.database
+from geoip2.erorrs import AddressNotFoundError
 import jsonlines
 import requests
 from bs4 import BeautifulSoup
@@ -655,9 +656,18 @@ def add_location_info(
     :return: Nothing. The list is updated in-place.
     :return:
     """
-    client_lat, client_lon, client_city, client_country, client_country_code = replace_ip_address(
-        client_ip, geoip_client
-    )
+    try:
+        client_lat, client_lon, client_city, client_country, client_country_code = replace_ip_address(
+            client_ip, geoip_client
+        )
+    except AddressNotFoundError:
+        print(f"Addresss {client_ip}, not found in database")
+        client_lat = None
+        client_lon = None
+        client_city = None
+        client_country = None
+        client_country_code = None
+
     location_record = {
         "latitude": client_lat,
         "longitude": client_lon,
@@ -670,7 +680,6 @@ def add_location_info(
         "unique_item_investigations": unique_item_investigations,
         "unique_item_requests": unique_item_requests,
     }
-
     location_info.append(location_record)
 
 
