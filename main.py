@@ -34,6 +34,7 @@ from bs4 import BeautifulSoup
 from google.cloud import storage
 from requests import Session
 from urllib.parse import quote
+import certifi
 
 
 def download(request):
@@ -525,7 +526,12 @@ def get_response(url: str) -> dict:
     :param url: The URL to the report.
     :return: Response in JSON format.
     """
-    response = requests.get(url)
+    print(url)
+    try:
+        response = requests.get(url, verify=certifi.where())
+    except requests.exceptions.SSLError:
+        print("Warning: No certificate found!")
+        response = requests.get(url, verify=False)  # TODO: This should not be false. Fix it.
     masked_url = re.sub(
         r"requestor_id=[^&]*", "requestor_id=<requestor_id>", re.sub("api_key=[^&]*", "api_key=<api_key>", url)
     )
