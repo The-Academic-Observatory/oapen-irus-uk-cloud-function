@@ -539,17 +539,29 @@ def get_response(url: str) -> dict:
         raise RuntimeError(
             f"Request unsuccessful, url: {url}, status code: {response.status_code}, "
             f"response: {response.text}, reason: {response.reason}"
-            f"Everything: {response}"
         )
     print(f"Successfully got response from URL: {masked_url}")
+
     try:
         response_json = response.json()
-    except ValueError as e:
+    except ValueError:
         print("Error parsing response as json")
         print("Status:", response.status_code)
         print("Headers:", response.headers)
         print("Content-Snippet:", response.text[:500])
-        raise RuntimeError("Invalid JSON. See logs.")
+        print("Attempting to extract json")
+
+        # Find the first '{'
+        idx = response.text.find("{")
+        # Slice from that position onwards
+        cleaned = response.text
+        if idx != -1:
+            cleaned = response.text[idx:]
+        try:
+            response_json = json.loads(cleaned)
+        except ValueError:
+            print("Content snipped post-clean:", cleaned[:500])
+            raise RuntimeError("Invalid JSON. Unable to salvage. See logs.")
     return response_json
 
 
