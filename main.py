@@ -28,7 +28,7 @@ from datetime import datetime
 from typing import List, Tuple, Union, Optional
 
 import geoip2.database
-from geoip2.erorrs import AddressNotFoundError
+from geoip2.errors import AddressNotFoundError
 import jsonlines
 import requests
 from bs4 import BeautifulSoup
